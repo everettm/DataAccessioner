@@ -125,12 +125,7 @@ def getDirectoryInfo_renameFiles(directory, verbose=0):
 
 	try:
 		for root, dirs, files in os.walk(ast.literal_eval("u'" + (directory.replace("\\", "\\\\")) + "'"), topdown=False):
-			print "----"
-			print root
-			print dirs
-			print files
 			if charsToRemove.search(os.path.basename(root)) != None:
-				print "root needs removal stuff"
 				root = cleanseName(os.path.dirname(root),os.path.basename(root),directory)
 			if os.path.basename(root) == "originals":
 				dirsInOriginals = os.listdir(root)
@@ -158,7 +153,6 @@ def getDirectoryInfo_renameFiles(directory, verbose=0):
 				total_size += os.path.getsize(filepath)
 				extType = os.path.splitext(filepath)[1]
 				fileTypes.add(extType)
-			print "----"
 	except:
 		import traceback
 		# Print the stack traceback
@@ -227,7 +221,6 @@ def main():
 		for direc in thePathList:
 			d = os.path.join(topDir,direc) # full path
 			if os.path.isdir(d):
-				print "\n\n\n\n\n\n"
 				print "accessioning", d
 				filesInDir = set(os.listdir(d))
 
