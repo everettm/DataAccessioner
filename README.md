@@ -33,7 +33,6 @@ The md5 hash for each directory is generated using the hashlib module in the med
 	hashlib.read(), the directory hash is updated using hashlib.update(). See getDirectoryInfo_renameFiles().
 
 #### TODO:
-* Append to previously existing rename files in the meta folder (rather than create a new one)
 * Add datestamp (plus index if needed) to the end of the import template file
 * Checksum generating time tests
 * Clean up code (implement a class structure)

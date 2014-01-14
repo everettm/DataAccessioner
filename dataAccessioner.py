@@ -217,11 +217,11 @@ def main():
 	# ACCESSION A DIRECTORY OF "BAGS"
 	if os.path.isdir(topDir):
 		thePathList = os.listdir(ast.literal_eval("u'" + (topDir.replace("\\", "\\\\")) + "'"))
-		print "accessioning..."
+		print "accessioning...\n"
 		for direc in thePathList:
 			d = os.path.join(topDir,direc) # full path
 			if os.path.isdir(d):
-				print "accessioning", d
+				print "current bag:", d, "\n"
 				filesInDir = set(os.listdir(d))
 
 				# If directory bag/data is not present, create it.
@@ -314,26 +314,24 @@ def main():
 				# write the rename file
 				if not dictIsEmpty(originalFileNames) or not dictIsEmpty(originalDirectoryNames):
 					ofString = os.path.join(topDir, direc, "data", "meta", "renames")
+					outFile2 = ""
+					appendToExistingFile = True
 					if os.path.exists(ofString + ".csv"):
-						name = False
-						renameNum = 1
-						ofString = ofString + str(renameNum)
-						while not name:
-							if os.path.exists(ofString + ".csv"):
-								renameNum+=1
-								ofString = ofString[:len(ofString) - 1] + str(renameNum)
-							else:
-								name = True
-					outFile2 = open(ofString + ".csv","wb")
+						outFile2 = open(ofString + ".csv", "a")
+					else:
+						outFile2 = open(ofString + ".csv","wb")
+						appendToExistingFile = False
+					
 					writer2 = csv.writer(outFile2, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
-					writer2.writerow(["New_Name", "Old_Name"])
+					if not appendToExistingFile:
+						writer2.writerow(["New_Name", "Old_Name", "Date"])
 
 					for entry in originalDirectoryNames.keys():
-						rowToWrite = [entry,originalDirectoryNames[entry].encode('utf-8')]
+						rowToWrite = [entry,originalDirectoryNames[entry].encode('utf-8'), str(datetime.datetime.now())]
 						writer2.writerow(rowToWrite)
 
 					for entry in originalFileNames.keys():
-						rowToWrite = [entry,originalFileNames[entry].encode('utf-8')]
+						rowToWrite = [entry,originalFileNames[entry].encode('utf-8'),str(datetime.datetime.now())]
 						writer2.writerow(rowToWrite)
 
 					outFile2.close()
@@ -390,10 +388,10 @@ def main():
 		if not dictIsEmpty(originalFileNames):
 			outFile2 = open(os.path.join(newBag, "meta", "renames.csv"), "wb")
 			writer2 = csv.writer(outFile2, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
-			writer2.writerow(["New_Name", "Old_Name"])
+			writer2.writerow(["New_Name", "Old_Name", "Date"])
 
 			for entry in originalFileNames.keys():
-				rowToWrite = [entry,originalFileNames[entry].encode('utf-8')]
+				rowToWrite = [entry,originalFileNames[entry].encode('utf-8'),str(datetime.datetime.now())]
 				writer2.writerow(rowToWrite)
 			outFile2.close()
 		print "done"
