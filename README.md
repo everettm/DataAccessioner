@@ -15,11 +15,11 @@ Run this program with the following syntax:
 `python dataAccessioner.py <path>`
 
 #### Input (2 options)
-* A full path to a directory OR a directory name in the same folder as accessioner.py. This directory should contain "bags" for accessioning.
-* A full path to a file OR a file name in the same folder as accessioner.py.
+* A full path to a directory OR a directory name in the same folder as dataAccessioner.py. This directory should contain "bags" for accessioning.
+* A full path to a file OR a file name in the same folder as dataAccessioner.py.
 
 #### Output
-* ImportTemplate.csv, an import template with information on each bag in the directory, stored in the directory (or, in the same directory as accessioner.py if a file was specified as the argument).
+* ImportTemplate.csv, an import template with information on each bag in the directory, stored in the directory (or, in the same directory as dataAccessioner.py if a file was specified as the argument).
 * Bags with cleansed filenames. Each bag contains the following directories within it:
 	* "dips"
 	* "meta" (contains a .csv document with original file names, if applicable)
