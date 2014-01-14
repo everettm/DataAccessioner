@@ -21,9 +21,9 @@ Run this program with the following syntax:
 #### Output
 * ImportTemplate.csv, an import template with information on each bag in the directory, stored in the directory (or, in the same directory as dataAccessioner.py if a file was specified as the argument).
 * Bags with cleansed filenames. Each bag contains the following directories within it:
-	* "dips"
-	* "meta" (contains a .csv document with original file names, if applicable)
-	* "originals" (contains all of the data that the beg held)
+	* /data/dips/
+	* /data/meta/ (contains a .csv document with original file names, if applicable)
+	* /data/originals/ (contains all of the data that the bag held originally)
 
 Notes
 -----
@@ -33,6 +33,5 @@ The md5 hash for each directory is generated using the hashlib module in the med
 	hashlib.read(), the directory hash is updated using hashlib.update(). See getDirectoryInfo_renameFiles().
 
 #### TODO:
-* Add datestamp (plus index if needed) to the end of the import template file
 * Checksum generating time tests
 * Clean up code (implement a class structure)
