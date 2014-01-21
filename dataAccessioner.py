@@ -80,7 +80,7 @@ def insertDateWithIndexNumber(fileName, filePath, dateDict, firstDateDict):
 
 # Remove special characters from filenames.
 def cleanseName(dirpath,f,bagName):
-
+	
 	# This is the case when cleanseName is called when the user has specified a directory of bags
 	if os.path.isdir(dirpath):
 		# cleanse filename, return the full path of the cleansed filename.
@@ -113,6 +113,19 @@ def cleanseName(dirpath,f,bagName):
 			os.rename(dirpath, os.path.join(os.path.dirname(dirpath), replacement))
 			
 		return os.path.join(os.path.dirname(dirpath), replacement)
+
+# Remove special characters from a single file (for use in a single file accession).
+def cleanseSingleFile(f):
+	dirPath = os.path.dirname(f)
+	f = os.path.basename(f)
+	replacement = f
+	for match in charsToRemove.finditer(f):
+		replacement = replacement.replace(match.group(),"_")
+	
+	if replacement != f:
+		originalFileNames[os.path.join("data", "originals", replacement)] = os.path.join("data","originals", f)
+		os.rename(os.path.join(dirPath,f),os.path.join(dirPath, replacement))
+	return os.path.join(dirPath, replacement)
 
 # Return an md5 checksum, size in bytes, and list of extensions for the given directory.
 def getDirectoryInfo_renameFiles(directory, verbose=0):
@@ -186,6 +199,8 @@ def main():
 
 	now = datetime.datetime.now()
 
+	header = ["Month", "Day", "Year", "Title", "Identifier", "Inclusive Dates", "Received Extent", "Extent Unit", "Processed Extent", "Extent Unit", "Material Type", "Processing Priority", "Ex. Comp. Mont", "Ex. Comp. Day", "Ex. Comp. Year", "Record Series", "Content", "Location", "Range", "Section", "Shelf", "Extent", "ExtentUnit", "CreatorName", "Donor", "Donor Contact Info", "Donor Notes", "Physical Description", "Scope Content", "Comments"]
+	
 	outFile = ""
 	outTitle = "ImportTemplate" + "_" + str(now.year) + str(now.month) + str(now.day)
 	if os.path.isdir(topDir):
@@ -196,12 +211,9 @@ def main():
 			while os.path.exists(os.path.join(topDir,outTitle + str(i) + '.csv')):
 				i+=1
 		outFile = open(os.path.join(topDir,outTitle + str(i) + '.csv'),'wb')
-	else:
-		outFile = open('ImportTemplate.csv','wb')
-
-	header = ["Month", "Day", "Year", "Title", "Identifier", "Inclusive Dates", "Received Extent", "Extent Unit", "Processed Extent", "Extent Unit", "Material Type", "Processing Priority", "Ex. Comp. Mont", "Ex. Comp. Day", "Ex. Comp. Year", "Record Series", "Content", "Location", "Range", "Section", "Shelf", "Extent", "ExtentUnit", "CreatorName", "Donor", "Donor Contact Info", "Donor Notes", "Physical Description", "Scope Content", "Comments"]
-	writer = csv.writer(outFile, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
-	writer.writerow(header)
+		
+		writer = csv.writer(outFile, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
+		writer.writerow(header)
 
 	importRow = {}
 	for item in header: 
@@ -259,6 +271,7 @@ def main():
 
 				# Cleanse the bag name (replace any odd characters with "_")
 				d, direc = cleanseDirectoryName(d, direc)
+				print d, direc
 
 				# Properly format the bag name
 				if validBagName.search(direc) == None:
@@ -292,7 +305,6 @@ def main():
 				importRow["Comments"] = "md5 hash: " + hashes
 				importRow["Extent"] = str(numFiles)
 
-				
 
 				conversion = 9.31323e-10
 				fileSize = size * conversion
@@ -349,44 +361,63 @@ def main():
 	else:
 		print
 		print "accessioning", os.path.basename(topDir), "...",
-		topDir = cleanseName(topDir, os.path.basename(topDir),"")
-		dateCreated = "%s%02d%02d" % (datetime.datetime.fromtimestamp(os.path.getctime(topDir)).year, datetime.datetime.fromtimestamp(os.path.getctime(topDir)).month, datetime.datetime.fromtimestamp(os.path.getctime(topDir)).day)
-		newValidBagName = "%s_%s" % (dateCreated,os.path.basename(os.path.splitext(topDir)[0]))
-		newBag = os.path.join(os.getcwd(),newValidBagName)
-		if not os.path.exists(newBag):
-			os.mkdir(newBag)
-			newBag = os.path.join(newBag,"data")
-			os.mkdir(newBag)
-			os.mkdir(os.path.join(newBag,"originals"))
-			os.mkdir(os.path.join(newBag,"meta"))
-			os.mkdir(os.path.join(newBag,"dips"))
-		else:
+
+		singleFile = cleanseSingleFile(topDir)
+		topDir = os.path.dirname(topDir)
+		dateCreated = "%s%02d%02d" % (datetime.datetime.fromtimestamp(os.path.getctime(singleFile)).year, datetime.datetime.fromtimestamp(os.path.getctime(singleFile)).month, datetime.datetime.fromtimestamp(os.path.getctime(topDir)).day)
+		newValidBagName = "%s_%s" % (dateCreated,os.path.basename(os.path.splitext(singleFile)[0]))
+		newBag = os.path.join(topDir,newValidBagName)
+		
+		# create bag and bag structure, move the file into data\originals\
+
+		if os.path.exists(newBag):
 			writeOver = raw_input("\nWarning: the bag " + newValidBagName + " already exists. Overwrite? [Y/N] ")
-			if writeOver[0] == "Y" or writeOver[0] == "y":
-				shutil.rmtree(newBag)
-				os.mkdir(newBag)
-				newBag = os.path.join(newBag,"data")
-				os.mkdir(newBag)
-				os.mkdir(os.path.join(newBag,"originals"))
-				os.mkdir(os.path.join(newBag,"meta"))
-				os.mkdir(os.path.join(newBag,"dips"))
-			else:
+			if writeOver[0] != "Y" and writeOver[0] != "y":
 				print "Will not overwrite. Exiting"
 				sys.exit()
+			shutil.rmtree(newBag)
 
+		os.mkdir(newBag)
+		dataDir = os.path.join(newBag,"data")
+		os.mkdir(dataDir)
+		os.mkdir(os.path.join(dataDir,"originals"))
+		os.mkdir(os.path.join(dataDir,"meta"))
+		os.mkdir(os.path.join(dataDir,"dips"))
+		newFilePath = os.path.join(dataDir, "originals")
+		shutil.move(singleFile, newFilePath)
+		singleFile = os.path.join(newFilePath, os.path.basename(singleFile))
+
+
+		importRow["Title"] = newValidBagName
 		importRow["Content"] = newValidBagName
+		importRow["Scope Content"] = newValidBagName
 		importRow["Identifier"] = dateCreated
+		importRow["Location"] = "Archives Network Storage"
+
+		hashes, size, extensions, numFiles = getDirectoryInfo_renameFiles(newBag)
+		
+		importRow["Comments"] = "md5 hash: " + hashes
+		importRow["Extent"] = str(numFiles)
+
 		conversion = 9.31323e-10
-		size = os.path.getsize(topDir)
 		fileSize = size * conversion
 		fileSizeString = "%.2f" % fileSize
 		importRow["Received Extent"] = fileSizeString
 		importRow["Processed Extent"] = fileSizeString
-		importRow["Comments"] = "Extensions include: " + os.path.splitext(topDir)[1]
-		shutil.move(topDir, os.path.join(newBag,"originals"))
+		
+		extensionString = "Extensions include: "
+		for item in extensions:
+			if len(item) > 0:
+				extensionString = extensionString + item + "; "
+		if len(extensions) == 0:
+			extensionString = ""
+		else:
+			extensionString = extensionString[:len(extensionString)-2]
+
+		importRow["Physical Description"] = extensionString
 
 		if not dictIsEmpty(originalFileNames):
-			outFile2 = open(os.path.join(newBag, "meta", "renames.csv"), "wb")
+			outFile2 = open(os.path.join(dataDir, "meta", "renames.csv"), "wb")
 			writer2 = csv.writer(outFile2, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
 			writer2.writerow(["New_Name", "Old_Name", "Date"])
 
@@ -396,7 +427,18 @@ def main():
 			outFile2.close()
 		print "done"
 
-	# write the import template row
+		# Open import template file
+		if os.path.exists(os.path.join(newBag,outTitle) + '.csv'):
+			outTitle = outTitle + "_"
+			i = 1
+			while os.path.exists(os.path.join(topDir,outTitle + str(i) + '.csv')):
+				i+=1
+		outFile = open(os.path.join(os.path.join(newBag,outTitle)) + '.csv','wb')
+
+		writer = csv.writer(outFile, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
+		writer.writerow(header)
+
+		# write the import template row
 		newRow = []
 		for item in header:
 			newRow.append(importRow[item])
