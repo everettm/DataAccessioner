@@ -12,6 +12,9 @@ import shutil
 import ast
 import hashlib
 
+with open('exclude.txt') as f:
+	excludes = [line.rstrip() for line in f]
+
 # Global regular expressions for use in various methods
 validBagName = re.compile("^[0-9]{8}_.+")
 validBagNameWithIndex = re.compile("^[0-9]{8}_[0-9]+_")
@@ -163,9 +166,11 @@ def getDirectoryInfo_renameFiles(directory, verbose=0):
 					f1.close()
 				except:
 					pass
-				total_size += os.path.getsize(filepath)
-				extType = os.path.splitext(filepath)[1]
-				fileTypes.add(extType)
+				if not names in excludes:
+					total_size += os.path.getsize(filepath)
+					extType = os.path.splitext(filepath)[1]
+					fileTypes.add(extType)
+
 	except:
 		import traceback
 		# Print the stack traceback
@@ -229,11 +234,12 @@ def main():
 	# ACCESSION A DIRECTORY OF "BAGS"
 	if os.path.isdir(topDir):
 		thePathList = os.listdir(ast.literal_eval("u'" + (topDir.replace("\\", "\\\\")) + "'"))
-		print "accessioning...\n"
+		print "accessioning..."
+		print "-----"
 		for direc in thePathList:
 			d = os.path.join(topDir,direc) # full path
 			if os.path.isdir(d):
-				print "current bag:", d, "\n"
+				print "current bag:", direc, "\n"
 				filesInDir = set(os.listdir(d))
 
 				# If directory bag/data is not present, create it.
@@ -267,11 +273,12 @@ def main():
 
 				# All other files in bag, move to bag/data/originals.
 				for f in filesInDir:
-					shutil.move(os.path.join(d,f), os.path.join(d,"data","originals"))
+					if not f in excludes:
+						shutil.move(os.path.join(d,f), os.path.join(d,"data","originals"))
 
 				# Cleanse the bag name (replace any odd characters with "_")
 				d, direc = cleanseDirectoryName(d, direc)
-				print d, direc
+				
 
 				# Properly format the bag name
 				if validBagName.search(direc) == None:
@@ -355,6 +362,7 @@ def main():
 				for item in header:
 					newRow.append(importRow[item])
 				writer.writerow(newRow)
+				print "accessioning complete for", direc, "\n-----"
 		print "done"
 	
 	# ACCESSION A SINGLE FILE
