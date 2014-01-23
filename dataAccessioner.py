@@ -207,7 +207,7 @@ def main():
 	header = ["Month", "Day", "Year", "Title", "Identifier", "Inclusive Dates", "Received Extent", "Extent Unit", "Processed Extent", "Extent Unit", "Material Type", "Processing Priority", "Ex. Comp. Mont", "Ex. Comp. Day", "Ex. Comp. Year", "Record Series", "Content", "Location", "Range", "Section", "Shelf", "Extent", "ExtentUnit", "CreatorName", "Donor", "Donor Contact Info", "Donor Notes", "Physical Description", "Scope Content", "Comments"]
 	
 	outFile = ""
-	outTitle = "ImportTemplate" + "_" + str(now.year) + str(now.month) + str(now.day)
+	outTitle = "ImportTemplate_%s%02d%02d" % (now.year, now.month, now.day)
 	if os.path.isdir(topDir):
 		i = ""
 		if os.path.exists(os.path.join(topDir,outTitle + '.csv')):
