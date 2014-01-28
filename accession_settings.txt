@@ -1,0 +1,5 @@
+EXCLUDES:
+Thumbs.db
+.DS_Store
+
+STORAGE_LOCATION_NAME = Archives Network Storage 1

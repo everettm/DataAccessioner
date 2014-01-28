@@ -12,9 +12,6 @@ import shutil
 import ast
 import hashlib
 
-with open('exclude.txt') as f:
-	excludes = [line.rstrip() for line in f]
-
 # Global regular expressions for use in various methods
 validBagName = re.compile("^[0-9]{8}_.+")
 validBagNameWithIndex = re.compile("^[0-9]{8}_[0-9]+_")
@@ -22,12 +19,31 @@ dateInValidBagName = re.compile("[0-9]{8}")
 dateInValidBagNameWithIndex = re.compile("[0-9]{8}(_[0-9]+(?=_))?")
 charsToRemove = re.compile("[:/'\+\=,\-\!\@\#\$\%\^\&\*\(\)\]\[ \t]")
 
-# Global dictionaries for use in various methods
+# Global dictionaries/lists for use in various methods
+excludes = []
 originalFileNames = {} # entries will be of the form {newName:oldName}
 originalDirectoryNames = {} # entries will be of the form {newName:oldName}
 dateDict = {} # entries will be of the form {date:count}
 firstDateDict = {} # entries will be of the form {date:filename}
+storageLocationName = ""
 
+with open('accession_settings.txt') as f:
+	f_content = [line.rstrip() for line in f]
+	parse_state = "none"
+	for i in range(len(f_content)):
+		line = f_content[i]
+		if parse_state == "none":
+			if line == "EXCLUDES:":
+				parse_state = "excludes"
+			elif line[:23] == "STORAGE_LOCATION_NAME =":
+				storageLocationName = line[24:]
+		elif parse_state == "excludes":
+			if line != "":
+				excludes.append(line)
+			else:
+				parse_state = "none"
+print excludes
+print storageLocationName
 
 # Remove special characters from directory names. Remove any indexing if it exists.
 def cleanseDirectoryName(fullPath, directoryName):
@@ -228,7 +244,7 @@ def main():
 	importRow["Day"] = now.day
 	importRow["Year"] = now.year
 	importRow["Extent Unit"] = "Gigabytes"
-	importRow["Location"] = "Archives Network Storage"
+	importRow["Location"] = storageLocationName
 	importRow["ExtentUnit"] = "Items"
 
 	# ACCESSION A DIRECTORY OF "BAGS"
@@ -238,7 +254,7 @@ def main():
 		print "-----"
 		for direc in thePathList:
 			d = os.path.join(topDir,direc) # full path
-			if os.path.isdir(d):
+			if os.path.isdir(d) and direc not in excludes:
 				print "current bag:", direc, "\n"
 				filesInDir = set(os.listdir(d))
 
@@ -363,6 +379,8 @@ def main():
 					newRow.append(importRow[item])
 				writer.writerow(newRow)
 				print "accessioning complete for", direc, "\n-----"
+			# else: (if not in excludes)
+
 		print "done"
 	
 	# ACCESSION A SINGLE FILE
