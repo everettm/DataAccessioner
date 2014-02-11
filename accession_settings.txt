@@ -1,5 +1,8 @@
 EXCLUDES:
 Thumbs.db
 .DS_Store
+bagit.txt
+manifest-md5.txt
+tagmanifest-md5.txt
 
 STORAGE_LOCATION_NAME = Archives Network Storage 1
