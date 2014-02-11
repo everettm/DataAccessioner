@@ -42,8 +42,6 @@ with open('accession_settings.txt') as f:
 				excludes.append(line)
 			else:
 				parse_state = "none"
-print excludes
-print storageLocationName
 
 # Remove special characters from directory names. Remove any indexing if it exists.
 def cleanseDirectoryName(fullPath, directoryName):
@@ -220,7 +218,12 @@ def main():
 
 	now = datetime.datetime.now()
 
-	header = ["Month", "Day", "Year", "Title", "Identifier", "Inclusive Dates", "Received Extent", "Extent Unit", "Processed Extent", "Extent Unit", "Material Type", "Processing Priority", "Ex. Comp. Mont", "Ex. Comp. Day", "Ex. Comp. Year", "Record Series", "Content", "Location", "Range", "Section", "Shelf", "Extent", "ExtentUnit", "CreatorName", "Donor", "Donor Contact Info", "Donor Notes", "Physical Description", "Scope Content", "Comments"]
+	header = ["Month", "Day", "Year", "Title", "Identifier", "Inclusive Dates", \
+		"Received Extent", "Extent Unit", "Processed Extent", "Extent Unit", \
+		"Material Type", "Processing Priority", "Ex. Comp. Mont", "Ex. Comp. Day",\
+		"Ex. Comp. Year", "Record Series", "Content", "Location", "Range", "Section",\
+		"Shelf", "Extent", "ExtentUnit", "CreatorName", "Donor", "Donor Contact Info",\
+		"Donor Notes", "Physical Description", "Scope Content", "Comments"]
 	
 	outFile = ""
 	outTitle = "ImportTemplate_%s%02d%02d" % (now.year, now.month, now.day)
@@ -236,9 +239,7 @@ def main():
 		writer = csv.writer(outFile, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
 		writer.writerow(header)
 
-	importRow = {}
-	for item in header: 
-		importRow[item] = ""
+	importRow = {val:"" for val in header}
 
 	importRow["Month"] = now.month
 	importRow["Day"] = now.day
