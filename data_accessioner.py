@@ -12,6 +12,8 @@ import shutil
 import ast
 import hashlib
 
+DEBUG = False
+
 class DataAccessioner:
     def __init__(self,settings_file):
         self.excludes = []
@@ -97,6 +99,7 @@ class DataAccessioner:
         """
         Given a full path to a directory, "bags" that data, writes the bag's information to file, and returns the new bag name.
         """
+
         self.create_bag_structure(bag_path)
         bag_path = self.cleanse_bag_name(bag_path) # Remove special characters
         
@@ -108,34 +111,37 @@ class DataAccessioner:
         self.import_row["Content"] = bag_name
         self.import_row["Scope Content"] = bag_name
 
-        identifier_string = bag_name[:15].replace("_","/") 
-        
+        identifier_string = bag_name[:15].replace("_","/")
+
         # CHECK EVERYTHING PAST HERE
-        hashes, size, extensions, num_files = self.traverse_bag_contents(bag_path)
         
-        self.import_row["Comments"] = "md5 hash: " + hashes
-        self.import_row["Extent"] = str(num_files)
+        # cleanse filenames in bag, save rename.csv metadata
+        b_dict = self.create_relative_bag_dict(bag_path,os.path.join(bag_path,"data","originals"),0)
+        renamed_files_list = self.cleanse_dict(os.path.join(bag_path,"data"),b_dict,0)
+        self.write_rename_file(bag_path,renamed_files_list)
+        # sys.exit()
 
-        conversion = 9.31323e-10
-        file_size = size * conversion
-        file_size_string = "%.2f" % file_size
-        self.import_row["Received Extent"] = file_size_string
-        self.import_row["Processed Extent"] = file_size_string
+        # hashes, size, extensions, num_files = self.traverse_bag_contents(bag_path)
         
-        extension_string = "Extensions include: "
-        for item in extensions:
-            if len(item) > 0:
-                extension_string = extension_string + item + "; "
-        if len(extensions) == 0:
-            extension_string = ""
-        else:
-            extension_string = extension_string[:len(extension_string)-2]
+        # self.import_row["Comments"] = "md5 hash: " + hashes
+        # self.import_row["Extent"] = str(num_files)
 
-        self.import_row["Physical Description"] = extension_string
+        # conversion = 9.31323e-10
+        # file_size = size * conversion
+        # file_size_string = "%.2f" % file_size
+        # self.import_row["Received Extent"] = file_size_string
+        # self.import_row["Processed Extent"] = file_size_string
+        
+        # extension_string = "Extensions include: "
+        # for item in extensions:
+        #     if len(item) > 0:
+        #         extension_string = extension_string + item + "; "
+        # if len(extensions) == 0:
+        #     extension_string = ""
+        # else:
+        #     extension_string = extension_string[:len(extension_string)-2]
 
-        # write the rename file
-        if not self.dict_is_empty(self.original_file_names) or not self.dict_is_empty(self.original_dir_names):
-            self.write_rename_file(bag_path)
+        # self.import_row["Physical Description"] = extension_string
 
         # write the import template row
         new_row = []
@@ -153,7 +159,7 @@ class DataAccessioner:
 
     def format_bag_name(self,bag_path):
         bag_name = os.path.basename(bag_path)
-        if self.valid_bag_name.search(bag_name) == None:
+        if self.valid_bag_name_format.search(bag_name) == None:
             creation_time = datetime.datetime.fromtimestamp(os.path.getctime(bag_path))
 
             # Again, format: yyyyddmm_hhmmss_originalDirTitle
@@ -187,26 +193,49 @@ class DataAccessioner:
 
         return replacement_path
 
-    def cleanse_dir_name(self, dir_path, bag_path):
-        dir_name = os.path.basename(dir_path)
-        replacement_name = dir_name
-        
-        for match in self.chars_to_remove.finditer(dir_name):
-            replacement_name = replacement_name.replace(match.group(),"_")
-        replacement_name = replacement_name.encode('cp850', errors='ignore')
+    def create_relative_bag_dict(self, walk_path,path_to_originals,depth):
+        """Given a bag with proper hierarchical structure, will create a dictionary with the proper relative paths for files."""
+        sub_dict = {}
+        return_path = os.path.basename(walk_path)
+        if depth > 2:
+            return_path = os.path.relpath(walk_path, os.path.dirname(path_to_originals))
+        return_dict = {return_path:sub_dict}
 
-        if replacement_name != file_name:
-            relative_path = os.path.dirname(relpath(dir_path,bag_path))
-
-    #       if replacement_name != file_name:
-    #           #TODO: Check if this is okay?
-    #           relative_path = os.path.relpath(file_dir_name,root_path)
-    #           self.original_dir_names[os.path.join(relative_path, replacement_name)] = os.path.join(relative_path,file_name)
-    #           replacement_path = os.path.join(file_dir_name,replacement_name)
-    #           os.rename(file_path,replacement_path)
-    #           file_path = replacement_path
-
-    #       return file_path
+        dirs_list, files_list = os.walk(walk_path).next()[1], os.walk(walk_path).next()[2]
+        for name in files_list:
+            if depth < 2:
+                sub_dict[name] = ""
+            else:
+                sub_dict[os.path.relpath(os.path.join(walk_path,name), os.path.dirname(path_to_originals))] = ""
+        for name in dirs_list:
+            sub_sub_dict = self.create_relative_bag_dict(os.path.join(walk_path,name),path_to_originals,depth+1)
+            new_key = sub_sub_dict.keys()[0]
+            sub_dict[new_key] = sub_sub_dict[new_key]
+        return return_dict
+    
+    def cleanse_dict(self, path_to_data,bag_dict, depth):
+        renamed_files_list = []
+        for item in bag_dict:
+            repl_str = item
+            # Remove any chars if necessary
+            for match in self.chars_to_remove.finditer(item):
+                repl_str = repl_str.replace(match.group(), "_")
+            # Rename the file if necessary, remove the previous key in place of the new one
+            if repl_str != item:
+                # If new name is in use, add an index
+                if os.path.exists(os.path.join(path_to_data,repl_str)):
+                    rename_index = 1
+                    while os.path.exists(os.path.join(path_to_data,repl_str + "_" + str(rename_index))):
+                        rename_index += 1
+                    repl_str = repl_str + "_" + str(rename_index)
+                # Rename the file
+                os.rename(os.path.join(path_to_data,os.path.dirname(repl_str),os.path.basename(item)),os.path.join(path_to_data,repl_str))
+                bag_dict[repl_str] = bag_dict[item]
+                renamed_files_list.append(list((item, repl_str)))
+                del bag_dict[item]
+            if bag_dict[repl_str] != "":
+                renamed_files_list = renamed_files_list + (self.cleanse_dict(path_to_data,bag_dict[repl_str], depth+1))
+        return renamed_files_list
 
     def update_original_dir_names(self, old_bag_name,new_bag_name):
         if old_bag_name in self.original_dir_names:
@@ -218,7 +247,7 @@ class DataAccessioner:
 
     def create_bag_structure(self, bag_path):
         files_in_bag = set(os.listdir(bag_path))
-
+        
         # If directory bag/data is not present, create it.
         if not os.path.exists(os.path.join(bag_path,"data")):
             os.mkdir(os.path.join(bag_path,"data"))
@@ -253,13 +282,13 @@ class DataAccessioner:
             if not f in self.excludes:
                 shutil.move(os.path.join(bag_path,f), os.path.join(bag_path,"data","originals"))
 
-    def write_rename_file(self, bag_path):
+    def write_rename_file(self, bag_path, files_to_rename):
         rename_file_path = os.path.join(bag_path,"data","meta","renames")
         out_file = ""
         append_to_old_file = True
-        
+
         if os.path.exists(rename_file_path + ".csv"):
-            out_file = open(rename_file_path + ".csv", "a")
+            out_file = open(rename_file_path + ".csv", "ab")
         else:
             out_file = open(rename_file_path + ".csv", "wb")
             append_to_old_file = False
@@ -269,17 +298,8 @@ class DataAccessioner:
         if not append_to_old_file:
             writer.writerow(["New_Name", "Old_Name", "Date"])
 
-        for entry in self.original_dir_names.keys():
-            row_to_write = [entry,self.original_dir_names[entry].encode('utf-8'), str(datetime.datetime.now())]
-            writer.writerow(row_to_write)
-
-        for entry in self.original_file_names.keys():
-            row_to_write = [entry,self.original_file_names[entry].encode('utf-8'),str(datetime.datetime.now())]
-            writer.writerow(row_to_write)
-
+        writer.writerows(files_to_rename)
         out_file.close()
-        self.original_file_names.clear()
-        self.original_dir_names.clear()
 
     def dict_is_empty(self, my_dict):
         for entry in my_dict.keys():
@@ -296,50 +316,69 @@ class DataAccessioner:
         file_types = set()
         num_files = 0
         # List of everything contained in the "originals" folder (the primary bag data we're concerned with)
-        dirs_in_originals_folder = os.listdir(os.path.join(bag_path,"originals"))
+        dirs_in_originals_folder = os.listdir(os.path.join(bag_path,"data","originals"))
+        for single_bag in dirs_in_originals_folder:
+            print single_bag
 
-        try:
-            for root, dirs, files in os.walk(ast.literal_eval("u'" + (bag_path.replace("\\", "\\\\")) + "'"), topdown=False):
-                if self.chars_to_remove.search(os.path.basename(root)) != None:
-                    root = self.cleanse_dir_name(root,bag_path)
-                if os.path.basename(root) == "originals":
-                    num_files+=len(files) + len(dirs)
-                elif os.path.basename(root) in dirs_in_originals_folder:
-                    dirs_in_originals_folder = dirs_in_originals_folder + os.listdir(root)
-                    # in case a directory after we've traversed originals has the same name as a directory in originals
-                    dirs_in_originals_folder.remove(os.path.basename(root))
-                    num_files+=len(files) + len(dirs)
-                for names in files:
-                    if verbose == 1:
-                        print 'Hashing', names
-                    filepath = self.cleanse_file_name(root,names)
-                    try:
-                        f1 = open(filepath, 'rb')
-                        a = True
-                        while a:
-                            # Read file in as little chunks and update md5Hash with each new chunk.
-                            buf = f1.read(4096)
-                            if not buf : break
-                            md5Hash.update(hashlib.md5(buf).hexdigest())
-                        f1.close()
-                    except:
-                        pass
-                    if not names in self.excludes:
-                        total_size += os.path.getsize(filepath)
-                        ext_type = os.path.splitext(filepath)[1]
-                        file_types.add(ext_type)
 
-        except:
-            import traceback
-            # Print the stack traceback
-            traceback.print_exc()
-            sys.exit()
+        # try:
+        #     for root, dirs, files in os.walk(ast.literal_eval("u'" + (bag_path.replace("\\", "\\\\")) + "'"), topdown=False):
+        #         if self.chars_to_remove.search(os.path.basename(root)) != None:
+        #             root = self.cleanse_dir_name(root,bag_path)
+        #         if os.path.basename(root) == "originals":
+        #             num_files+=len(files) + len(dirs)
+        #         elif os.path.basename(root) in dirs_in_originals_folder:
+        #             dirs_in_originals_folder = dirs_in_originals_folder + os.listdir(root)
+        #             # in case a directory after we've traversed originals has the same name as a directory in originals
+        #             dirs_in_originals_folder.remove(os.path.basename(root))
+        #             num_files+=len(files) + len(dirs)
+        #         for names in files:
+        #             if verbose == 1:
+        #                 print 'Hashing', names
+        #             filepath = self.cleanse_file_name(root,names)
+        #             try:
+        #                 f1 = open(filepath, 'rb')
+        #                 a = True
+        #                 while a:
+        #                     # Read file in as little chunks and update md5Hash with each new chunk.
+        #                     buf = f1.read(4096)
+        #                     if not buf : break
+        #                     md5Hash.update(hashlib.md5(buf).hexdigest())
+        #                 f1.close()
+        #             except:
+        #                 pass
+        #             if not names in self.excludes:
+        #                 total_size += os.path.getsize(filepath)
+        #                 ext_type = os.path.splitext(filepath)[1]
+        #                 file_types.add(ext_type)
+
+        # except:
+        #     import traceback
+        #     # Print the stack traceback
+        #     traceback.print_exc()
+        #     sys.exit()
 
         return md5Hash.hexdigest(), total_size, file_types, num_files
+
+    def str_dict(self, bag_dict, depth):
+        ret_str = ""
+        for item in bag_dict:
+            for i in range(depth):
+                ret_str += "\t"
+            ret_str += item + "\n"
+            if bag_dict[item] != "":
+                ret_str += self.str_dict(bag_dict[item],depth+1)
+        return ret_str
 
 
 def main():
     accessioner = DataAccessioner('accession_settings.txt')
+    if DEBUG:
+        if os.path.exists(sys.argv[1] + "-copy"):
+            shutil.rmtree(sys.argv[1])
+            shutil.copytree(sys.argv[1] + "-copy", sys.argv[1])
+        else:
+            shutil.copytree(sys.argv[1], sys.argv[1] + "-copy")
     accessioner.accession_bags_in_dir(sys.argv[1])
 
 main()
