@@ -12,7 +12,7 @@ import shutil
 import ast
 import hashlib
 
-DEBUG = True
+DEBUG = False
 
 class DataAccessioner:
     def __init__(self,settings_file):
@@ -102,7 +102,6 @@ class DataAccessioner:
         """
         Given a full path to a directory, "bags" that data, writes the bag's information to file, and returns the new bag name.
         """
-        print "bag_path:", bag_path
         self.create_bag_structure(bag_path)
         bag_path = self.cleanse_bag_name(bag_path) # Remove special characters
         
@@ -157,11 +156,7 @@ class DataAccessioner:
         """
         Given a full path to a file, creates a new "bag" to hold it, writes the bag's information to file, and returns the new bag name.
         """
-        # print os.path.basename(file_path)
-        # print file_path
-        # print os.path.splitext(file_path)[0]
         new_directory = os.path.splitext(file_path)[0]
-        print new_directory
         if os.path.exists(new_directory):
             i = 1
             while os.path.exists(new_directory + str(i)):
@@ -169,16 +164,14 @@ class DataAccessioner:
             new_directory = new_directory + str (i)
         os.mkdir(new_directory)
         os.rename(file_path,os.path.join(new_directory, os.path.basename(file_path)))
-        # shutil.move(file_path,new_directory)
         file_path = new_directory
 
         if DEBUG:
             print "file:", file_path
+
         return self.accession_bag(os.path.splitext(file_path)[0])
 
     def create_bag_structure(self, bag_path):
-        print "again, bag_path:", bag_path
-        print os.listdir(bag_path)
         files_in_bag = set(os.listdir(bag_path))
         
         # If directory bag/data is not present, create it.
