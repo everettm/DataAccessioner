@@ -17,6 +17,7 @@ DEBUG = False
 class DataAccessioner:
     def __init__(self,settings_file):
         self.excludes = []
+        self.excludes_regex = []
         self.storage_location_name = ""
         self.initialize_accession_settings(settings_file)
 
@@ -61,11 +62,20 @@ class DataAccessioner:
                         parse_state = "excludes"
                     elif line[:23] == "STORAGE_LOCATION_NAME =":
                         self.storage_location_name = line[24:]
+                    elif line == "EXCLUDE_REGEX:":
+                        parse_state = "regex"
                 elif parse_state == "excludes":
                     if line != "":
                         self.excludes.append(line)
                     else:
                         parse_state = "none"
+                elif parse_state == "regex":
+                    if line != "":
+                        self.excludes_regex.append(line)
+                    else:
+                        parse_state = "none"
+        for i in range(len(self.excludes_regex)):
+            self.excludes_regex[i] = re.compile(self.excludes_regex[i])
 
     def initialize_import_file(self, top_dir):
         now = datetime.datetime.now()
@@ -88,7 +98,7 @@ class DataAccessioner:
         if DEBUG:
             print path_list
         for bag in path_list:
-            if bag not in self.excludes:
+            if not self.is_excluded(bag):
                 print "current bag:", bag, "\n"
                 full_bag_path = os.path.join(top_dir,bag)
                 if os.path.isdir(full_bag_path):
@@ -96,6 +106,8 @@ class DataAccessioner:
                 else:
                     bag = self.accession_file(full_bag_path)
                 print "accessioning complete for", bag, "\n-----"
+            else:
+                print 'not accessioning', bag, "based on accession settings \n-----"
         print "done"
 
     def accession_bag(self, bag_path):
@@ -205,7 +217,7 @@ class DataAccessioner:
 
         # All other files in bag, move to bag/data/originals.
         for f in files_in_bag:
-            if not f in self.excludes:
+            if not self.is_excluded(f):
                 shutil.move(os.path.join(bag_path,f), os.path.join(bag_path,"data","originals"))
 
     def cleanse_bag_name(self, bag_path):
@@ -353,7 +365,7 @@ class DataAccessioner:
                         f1.close()
                     except:
                         pass
-                    if not names in self.excludes:
+                    if not self.is_excluded(names):
                         total_size += os.path.getsize(filepath)
                         ext_type = os.path.splitext(filepath)[1]
                         file_types.add(ext_type)
@@ -376,21 +388,32 @@ class DataAccessioner:
                 ret_str += self.str_dict(bag_dict[item],depth+1)
         return ret_str
 
+    def is_excluded(self, filename):
+        if filename in self.excludes:
+            return True
+        for pattern in self.excludes_regex:
+            if pattern.search(filename) != None:
+                return True
+        return False
+
 def main():
     accessioner = DataAccessioner('accession_settings.txt')
-    if DEBUG:
-        if os.path.exists(sys.argv[1]):
+    
+    if os.path.exists(sys.argv[1]):
+        if DEBUG:
             if os.path.exists(sys.argv[1] + "-copy"):
                 shutil.rmtree(sys.argv[1])
                 shutil.copytree(sys.argv[1] + "-copy", sys.argv[1])
             else:
                 shutil.copytree(sys.argv[1], sys.argv[1] + "-copy")
-        else:
+    else:
+        if DEBUG:        
             if os.path.exists(sys.argv[1] + "-copy"):
                 shutil.copytree(sys.argv[1] + "-copy", sys.argv[1])
             else:
                 print "usage: `python data_accessioner.py <path>`"
                 return
+
     accessioner.accession_bags_in_dir(sys.argv[1])
 
 main()
