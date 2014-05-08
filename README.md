@@ -12,10 +12,10 @@ Usage Instructions
 ------------------
 Run this program with the following syntax:
 
-`python dataAccessioner.py <path>`
+`python data_accessioner.py <path>`
 
 #### Input (2 options)
-* A full path to a directory OR a directory name in the same folder as dataAccessioner.py. This directory should contain "bags" for accessioning.
+* A full path to a directory OR a directory name in the same folder as dataAccessioner.py. This directory should contain files and "bags" for accessioning.
 * A full path to a file OR a file name in the same folder as dataAccessioner.py.
 
 #### Output

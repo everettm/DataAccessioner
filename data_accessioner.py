@@ -23,11 +23,12 @@ class DataAccessioner:
         # Regular expressions for file name cleansing
         # Bag format: yyyyddmm_hhmmss_originalDirTitle
         self.valid_bag_name_format = re.compile("^[0-9]{8}_[0-9]{6}_.*")
-        self.chars_to_remove = re.compile("[:/'\+\=,\-\!\@\#\$\%\^\&\*\(\)\]\[ \t]") # characters to remove from files
+        self.chars_to_remove = re.compile("[:/'\+\=,\!\@\#\$\%\^\&\*\(\)\]\[ \t]") # characters to remove from files
 
         # Global dictionaries/lists for use in various methods
         self.original_file_names = {} # entries will be of the form {new_name:old_name}
 
+        self.import_file_name = None
         self.import_file = None
         self.import_writer = None
         self.import_header = ["Month", "Day", "Year", "Title", "Identifier", \
@@ -75,6 +76,7 @@ class DataAccessioner:
             i = 1
             while os.path.exists(os.path.join(top_dir,file_name + str(i) + '.csv')):
                 i+=1
+        self.import_file_name = file_name + str(i) + '.csv'
         self.import_file = open(os.path.join(top_dir,file_name + str(i) + '.csv'),'wb')
         self.import_writer = csv.writer(self.import_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
         self.import_writer.writerow(self.import_header)
@@ -82,7 +84,9 @@ class DataAccessioner:
     def accession_bags_in_dir(self,top_dir):
         self.initialize_import_file(top_dir)
         print "accessioning...\n-----"
-        path_list = os.listdir(ast.literal_eval("u'" + (top_dir.replace("\\", "\\\\")) + "'"))
+        path_list = [x for x in os.listdir(ast.literal_eval("u'" + (top_dir.replace("\\", "\\\\")) + "'")) if x != self.import_file_name]
+        if DEBUG:
+            print path_list
         for bag in path_list:
             if bag not in self.excludes:
                 print "current bag:", bag, "\n"
@@ -98,7 +102,7 @@ class DataAccessioner:
         """
         Given a full path to a directory, "bags" that data, writes the bag's information to file, and returns the new bag name.
         """
-
+        print "bag_path:", bag_path
         self.create_bag_structure(bag_path)
         bag_path = self.cleanse_bag_name(bag_path) # Remove special characters
         
@@ -153,9 +157,28 @@ class DataAccessioner:
         """
         Given a full path to a file, creates a new "bag" to hold it, writes the bag's information to file, and returns the new bag name.
         """
-        return "FILE"
+        # print os.path.basename(file_path)
+        # print file_path
+        # print os.path.splitext(file_path)[0]
+        new_directory = os.path.splitext(file_path)[0]
+        print new_directory
+        if os.path.exists(new_directory):
+            i = 1
+            while os.path.exists(new_directory + str(i)):
+                i+=1
+            new_directory = new_directory + str (i)
+        os.mkdir(new_directory)
+        os.rename(file_path,os.path.join(new_directory, os.path.basename(file_path)))
+        # shutil.move(file_path,new_directory)
+        file_path = new_directory
+
+        if DEBUG:
+            print "file:", file_path
+        return self.accession_bag(os.path.splitext(file_path)[0])
 
     def create_bag_structure(self, bag_path):
+        print "again, bag_path:", bag_path
+        print os.listdir(bag_path)
         files_in_bag = set(os.listdir(bag_path))
         
         # If directory bag/data is not present, create it.
@@ -362,12 +385,19 @@ class DataAccessioner:
 
 def main():
     accessioner = DataAccessioner('accession_settings.txt')
-    # if DEBUG:
-    #     if os.path.exists(sys.argv[1] + "-copy"):
-    #         shutil.rmtree(sys.argv[1])
-    #         shutil.copytree(sys.argv[1] + "-copy", sys.argv[1])
-    #     else:
-    #         shutil.copytree(sys.argv[1], sys.argv[1] + "-copy")
+    if DEBUG:
+        if os.path.exists(sys.argv[1]):
+            if os.path.exists(sys.argv[1] + "-copy"):
+                shutil.rmtree(sys.argv[1])
+                shutil.copytree(sys.argv[1] + "-copy", sys.argv[1])
+            else:
+                shutil.copytree(sys.argv[1], sys.argv[1] + "-copy")
+        else:
+            if os.path.exists(sys.argv[1] + "-copy"):
+                shutil.copytree(sys.argv[1] + "-copy", sys.argv[1])
+            else:
+                print "usage: `python data_accessioner.py <path>`"
+                return
     accessioner.accession_bags_in_dir(sys.argv[1])
 
 main()
