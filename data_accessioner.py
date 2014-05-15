@@ -12,7 +12,7 @@ import shutil
 import ast
 import hashlib
 
-DEBUG = False
+DEBUG = True
 
 class DataAccessioner:
     def __init__(self,settings_file):
@@ -77,37 +77,51 @@ class DataAccessioner:
         for i in range(len(self.excludes_regex)):
             self.excludes_regex[i] = re.compile(self.excludes_regex[i])
 
-    def initialize_import_file(self, top_dir):
-        now = datetime.datetime.now()
-        file_name = "ImportTemplate_%s%02d%02d" % (now.year, now.month, now.day)
-        i = ""
-        if os.path.exists(os.path.join(top_dir,file_name + '.csv')):
-            file_name = file_name + "_"
-            i = 1
-            while os.path.exists(os.path.join(top_dir,file_name + str(i) + '.csv')):
-                i+=1
-        self.import_file_name = file_name + str(i) + '.csv'
-        self.import_file = open(os.path.join(top_dir,file_name + str(i) + '.csv'),'wb')
-        self.import_writer = csv.writer(self.import_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
-        self.import_writer.writerow(self.import_header)
+    def initialize_import_file(self, top_dir, bag_in_place):
+        if self.create_import_file:
+            if bag_in_place:
+                top_dir = os.path.dirname(top_dir)
+            now = datetime.datetime.now()
+            file_name = "ImportTemplate_%s%02d%02d" % (now.year, now.month, now.day)
+            i = ""
+            if os.path.exists(os.path.join(top_dir,file_name + '.csv')):
+                file_name = file_name + "_"
+                i = 1
+                while os.path.exists(os.path.join(top_dir,file_name + str(i) + '.csv')):
+                    i+=1
+            self.import_file_name = file_name + str(i) + '.csv'
+            self.import_file = open(os.path.join(top_dir,file_name + str(i) + '.csv'),'wb')
+            self.import_writer = csv.writer(self.import_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
+            self.import_writer.writerow(self.import_header)
 
-    def accession_bags_in_dir(self,top_dir):
-        self.initialize_import_file(top_dir)
+    def accession_bags_in_dir(self,top_dir, bag_in_place, import_file):
+        self.create_import_file = import_file
+        self.initialize_import_file(top_dir, bag_in_place)
+
         print "accessioning...\n-----"
-        path_list = [x for x in os.listdir(ast.literal_eval("u'" + (top_dir.replace("\\", "\\\\")) + "'")) if x != self.import_file_name]
-        if DEBUG:
-            print path_list
-        for bag in path_list:
+        if bag_in_place:
+            bag = os.path.basename(top_dir)
             if not self.is_excluded(bag):
-                print "current bag:", bag, "\n"
-                full_bag_path = os.path.join(top_dir,bag)
-                if os.path.isdir(full_bag_path):
-                    bag = self.accession_bag(full_bag_path)
+                if os.path.isdir(top_dir):
+                    bag = self.accession_bag(top_dir)
                 else:
-                    bag = self.accession_file(full_bag_path)
+                    bag = self.accession_file(top_dir)
                 print "accessioning complete for", bag, "\n-----"
             else:
                 print 'not accessioning', bag, "based on accession settings \n-----"
+        else:
+            path_list = [x for x in os.listdir(ast.literal_eval("u'" + (top_dir.replace("\\", "\\\\")) + "'")) if x != self.import_file_name]
+            for bag in path_list:
+                if not self.is_excluded(bag):
+                    print "current bag:", bag, "\n"
+                    full_bag_path = os.path.join(top_dir,bag)
+                    if os.path.isdir(full_bag_path):
+                        bag = self.accession_bag(full_bag_path)
+                    else:
+                        bag = self.accession_file(full_bag_path)
+                    print "accessioning complete for", bag, "\n-----"
+                else:
+                    print 'not accessioning', bag, "based on accession settings \n-----"
         print "done"
 
     def accession_bag(self, bag_path):
@@ -118,14 +132,6 @@ class DataAccessioner:
         bag_path = self.cleanse_bag_name(bag_path) # Remove special characters
         
         bag_path = self.format_bag_name(bag_path) # Add an identifier if needed
-
-        bag_name = os.path.basename(bag_path)
-
-        self.import_row["Title"] = bag_name
-        self.import_row["Content"] = bag_name
-        self.import_row["Scope Content"] = bag_name
-
-        identifier_string = bag_name[:15].replace("_","/")
         
         # cleanse filenames in bag, save rename.csv metadata
         b_dict, needs_renaming = self.create_relative_bag_dict(bag_path,os.path.join(bag_path,"data","originals"),0)
@@ -134,33 +140,38 @@ class DataAccessioner:
             renamed_files_list = self.cleanse_dict(os.path.join(bag_path,"data"),b_dict,0)
             self.write_rename_file(bag_path,renamed_files_list)
 
-        hashes, size, extensions, num_files = self.traverse_bag_contents(bag_path)
+        size, extensions, num_files = self.traverse_bag_contents(bag_path)
         
-        self.import_row["Comments"] = "md5 hash: " + hashes
-        self.import_row["Extent"] = str(num_files)
+        if self.create_import_file:
+            bag_name = os.path.basename(bag_path)
+            
+            self.import_row["Title"] = bag_name
+            self.import_row["Content"] = bag_name
+            self.import_row["Scope Content"] = bag_name
+            self.import_row["Extent"] = str(num_files)
 
-        conversion = 9.31323e-10
-        file_size = size * conversion
-        file_size_string = "%.2f" % file_size
-        self.import_row["Received Extent"] = file_size_string
-        self.import_row["Processed Extent"] = file_size_string
-        
-        extension_string = "Extensions include: "
-        for item in extensions:
-            if len(item) > 0:
-                extension_string = extension_string + item + "; "
-        if len(extensions) == 0:
-            extension_string = ""
-        else:
-            extension_string = extension_string[:len(extension_string)-2]
+            conversion = 9.31323e-10
+            file_size = size * conversion
+            file_size_string = "%.2f" % file_size
+            self.import_row["Received Extent"] = file_size_string
+            self.import_row["Processed Extent"] = file_size_string
+            
+            extension_string = "Extensions include: "
+            for item in extensions:
+                if len(item) > 0:
+                    extension_string = extension_string + item + "; "
+            if len(extensions) == 0:
+                extension_string = ""
+            else:
+                extension_string = extension_string[:len(extension_string)-2]
 
-        self.import_row["Physical Description"] = extension_string
+            self.import_row["Physical Description"] = extension_string
 
-        # write the import template row
-        new_row = []
-        for item in self.import_header:
-            new_row.append(self.import_row[item])
-        self.import_writer.writerow(new_row)
+            # write the import template row
+            new_row = []
+            for item in self.import_header:
+                new_row.append(self.import_row[item])
+            self.import_writer.writerow(new_row)
 
         return os.path.basename(bag_path)
 
@@ -177,9 +188,6 @@ class DataAccessioner:
         os.mkdir(new_directory)
         os.rename(file_path,os.path.join(new_directory, os.path.basename(file_path)))
         file_path = new_directory
-
-        if DEBUG:
-            print "file:", file_path
 
         return self.accession_bag(os.path.splitext(file_path)[0])
 
@@ -331,16 +339,16 @@ class DataAccessioner:
 
     def traverse_bag_contents(self, bag_path, verbose=0):
         """
-        Returns: hashes, size, extensions, num_files
+        Returns: size, extensions, num_files
         """
-        md5Hash = hashlib.md5() # Will be the hash returned for the directory.
 
         total_size = 0
         file_types = set()
         num_files = 0
         # List of everything contained in the "originals" folder (the primary bag data we're concerned with)
         dirs_in_originals_folder = os.listdir(os.path.join(bag_path,"data","originals")) #TODO: excludes filter if take out hashing
-        
+        checksumsDict = {}
+
         try:
             for root, dirs, files in os.walk(ast.literal_eval("u'" + (bag_path.replace("\\", "\\\\")) + "'"), topdown=False):
                 if os.path.basename(root) == "originals":
@@ -356,27 +364,54 @@ class DataAccessioner:
                     filepath = os.path.join(root,names)
                     try:
                         f1 = open(filepath, 'rb')
-                        a = True
-                        while a:
-                            # Read file in as little chunks and update md5Hash with each new chunk.
-                            buf = f1.read(4096)
-                            if not buf : break
-                            md5Hash.update(hashlib.md5(buf).hexdigest())
+                        m = hashlib.md5()
+                        while True:
+                            bytes = f1.read(16384)
+                            if not bytes:
+                                break
+                            m.update(bytes)
+                        checksumsDict[filepath] = m.hexdigest()
                         f1.close()
                     except:
-                        pass
+                        print "???"
                     if not self.is_excluded(names):
                         total_size += os.path.getsize(filepath)
                         ext_type = os.path.splitext(filepath)[1]
                         file_types.add(ext_type)
-
         except:
             import traceback
             # Print the stack traceback
             traceback.print_exc()
             sys.exit()
 
-        return md5Hash.hexdigest(), total_size, file_types, num_files
+        self.create_required_elements(bag_path, checksumsDict)
+
+        return total_size, file_types, num_files
+
+    def create_required_elements(self, bag_path, checksum_dict):
+        # Create the required payload manifest tag file
+        with open(os.path.join(bag_path,"manifest-md5.txt"), "wb") as md5_file:
+            for item in checksum_dict:
+                md5_file.write(checksum_dict[item] + "  " + os.path.relpath(item, item.split("data")[0]).replace("\\","/") + "\n")
+ 
+        # Create the required bagit.txt file
+        with open(os.path.join(bag_path,"bagit.txt"),"wb") as f:
+            f.write("BagIt-Version: 0.97\nTag-File-Character-Encoding: UTF-8\n")
+
+    def splitall(self, path):
+        allparts = []
+        while 1:
+            parts = os.path.split(path)
+            if parts[0] == path:  # sentinel for absolute paths
+                allparts.insert(0, parts[0])
+                break
+            elif parts[1] == path: # sentinel for relative paths
+                allparts.insert(0, parts[1])
+                break
+            else:
+                path = parts[0]
+                allparts.insert(0, parts[1])
+        return allparts
 
     def str_dict(self, bag_dict, depth):
         ret_str = ""
@@ -396,24 +431,52 @@ class DataAccessioner:
                 return True
         return False
 
+def usage_message():
+    print "\ndata_accessioner: Cleanses a directory of files/dirs and places them in properly-formatted bags using the bagit specifications.\
+    \n\nUsage:\
+            \n\tpython data_accessioner.py [--bt | -b] <path>\
+            \n\tpython data_accessioner.py -h | --help\
+        \n\nOptions:\
+            \n\t-h --help\tShow this screen.\
+            \n\t-b        \tSpecify a single directory/file to bag in place without a corresponding import file.\
+            \n\t--bt      \tSpecify a single directory/file to bag in place (creates a corresponding import file as a sibling to the bag).\
+        \n\nDependencies:\
+            \n\taccession_settings.txt"
+
+
 def main():
+    # TODO: make this more robust.
     accessioner = DataAccessioner('accession_settings.txt')
-    
-    if os.path.exists(sys.argv[1]):
+
+    if len(sys.argv) <= 1 or len(sys.argv) > 3 or sys.argv[1] == "--help" or sys.argv[1] == "-h":
+        return usage_message()
+
+    path_arg, bag_in_place, import_file = sys.argv[1], False, True
+
+    if len(sys.argv) == 3:
+        if sys.argv[1] == "-b" or sys.argv[1] == "--bt":
+            bag_in_place = True
+            if sys.argv[1] == "-b":
+                import_file = False
+            path_arg = sys.argv[2]
+        else:
+            return usage_message()
+
+    if os.path.exists(path_arg):
         if DEBUG:
-            if os.path.exists(sys.argv[1] + "-copy"):
-                shutil.rmtree(sys.argv[1])
-                shutil.copytree(sys.argv[1] + "-copy", sys.argv[1])
+            if os.path.exists(path_arg + "-copy"):
+                shutil.rmtree(path_arg)
+                shutil.copytree(path_arg + "-copy", path_arg)
             else:
-                shutil.copytree(sys.argv[1], sys.argv[1] + "-copy")
+                if os.path.isdir(path_arg):
+                    shutil.copytree(path_arg, path_arg + "-copy")
     else:
         if DEBUG:        
-            if os.path.exists(sys.argv[1] + "-copy"):
-                shutil.copytree(sys.argv[1] + "-copy", sys.argv[1])
+            if os.path.exists(path_arg + "-copy"):
+                shutil.copytree(path_arg + "-copy", path_arg)
             else:
-                print "usage: `python data_accessioner.py <path>`"
-                return
+                return usage_message()
 
-    accessioner.accession_bags_in_dir(sys.argv[1])
+    accessioner.accession_bags_in_dir(path_arg, bag_in_place, import_file)
 
 main()

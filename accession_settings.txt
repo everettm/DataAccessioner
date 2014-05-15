@@ -4,6 +4,7 @@ Thumbs.db
 bagit.txt
 manifest-md5.txt
 tagmanifest-md5.txt
+bag-info.txt
 
 EXCLUDE_REGEX:
 ImportTemplate_[0-9]{8}(_[0-9]+)?\.csv
