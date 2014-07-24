@@ -1,7 +1,7 @@
 ''' 
 data_accessioner.py
-Code by Mikenna Everett
-mikenna.everett@gmail.com
+Code by Liam Everett
+liam.m.everett@gmail.com
 '''
 import os
 import sys
@@ -12,7 +12,7 @@ import shutil
 import ast
 import hashlib
 
-DEBUG = True
+DEBUG = False
 
 class DataAccessioner:
     def __init__(self,settings_file):
@@ -144,7 +144,7 @@ class DataAccessioner:
         
         if self.create_import_file:
             bag_name = os.path.basename(bag_path)
-            
+
             self.import_row["Title"] = bag_name
             self.import_row["Content"] = bag_name
             self.import_row["Scope Content"] = bag_name
@@ -257,6 +257,12 @@ class DataAccessioner:
             date_created = "%s%02d%02d_%02d%02d%02d" % (creation_time.year, creation_time.day, \
             creation_time.month, creation_time.hour, creation_time.minute, creation_time.second)
             new_valid_bag_name = "%s_%s" % (date_created,bag_name)
+
+            while os.path.exists(os.path.join(os.path.dirname(bag_path),new_valid_bag_name)):
+                date_created = "%s%02d%02d_%02d%02d%02d" % (creation_time.year, creation_time.day, \
+                creation_time.month, creation_time.hour, creation_time.minute, creation_time.second + 1)
+                new_valid_bag_name = "%s_%s" % (date_created,bag_name)
+                
             os.rename(bag_path,os.path.join(os.path.dirname(bag_path),new_valid_bag_name))
             bag_path = os.path.join(os.path.dirname(bag_path),new_valid_bag_name)
 
