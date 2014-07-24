@@ -30,4 +30,5 @@ This program will overwrite original filenames, which are stored in "renames.csv
 Bagit link: https://wiki.carleton.edu/display/carl/Bagit
 
 #### TODO:
-Directories containing numbers get stored with a weird identifier. Fix that?
+-Directories containing numbers get stored with a weird identifier. Fix that?
+-Make sure the bags follow the protocol outlined here: http://tools.ietf.org/html/draft-kunze-bagit-10#section-2.1
