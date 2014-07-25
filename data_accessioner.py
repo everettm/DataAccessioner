@@ -52,6 +52,9 @@ class DataAccessioner:
         self.import_row["ExtentUnit"] = "Items"
 
     def initialize_accession_settings(self,settings_file):
+        """ 
+        Using accession_settings.txt, sets self.storage_location_name, self.excludes, and self.excludes_regex 
+        """        
         with open(settings_file) as f:
             f_content = [line.rstrip() for line in f]
             parse_state = "none"
@@ -129,16 +132,16 @@ class DataAccessioner:
         Given a full path to a directory, "bags" that data, writes the bag's information to file, and returns the new bag name.
         """
         self.create_bag_structure(bag_path)
-        bag_path = self.cleanse_bag_name(bag_path) # Remove special characters
+        bag_path, bag_renamed = self.cleanse_bag_name(bag_path) # Remove special characters
         
         bag_path = self.format_bag_name(bag_path) # Add an identifier if needed
         
         # cleanse filenames in bag, save rename.csv metadata
         b_dict, needs_renaming = self.create_relative_bag_dict(bag_path,os.path.join(bag_path,"data","originals"),0)
 
-        if needs_renaming:
+        if needs_renaming or bag_renamed:
             renamed_files_list = self.cleanse_dict(os.path.join(bag_path,"data"),b_dict,0)
-            self.write_rename_file(bag_path,renamed_files_list)
+            self.write_rename_file(bag_path,renamed_files_list,bag_renamed)
 
         size, extensions, num_files = self.traverse_bag_contents(bag_path)
         
@@ -180,6 +183,14 @@ class DataAccessioner:
         Given a full path to a file, creates a new "bag" to hold it, writes the bag's information to file, and returns the new bag name.
         """
         new_directory = os.path.splitext(file_path)[0]
+
+        # ignores first chars b/c colon from C: will be removed. (for now) the parent dir must not have any spaces. Code from cleanse_bag_name
+        replacement_name = new_directory[2:]
+        for match in self.chars_to_remove.finditer(new_directory):
+            replacement_name = replacement_name.replace(match.group(), "_")
+        replacement_name = replacement_name.encode('cp850', errors='ignore')
+        new_directory = new_directory[:2] + replacement_name
+
         if os.path.exists(new_directory):
             i = 1
             while os.path.exists(new_directory + str(i)):
@@ -233,7 +244,7 @@ class DataAccessioner:
         Remove special characters from bag names.
         """
         replacement_path = bag_path
-        
+
         bag_name = os.path.basename(bag_path)
         replacement_name = bag_name
 
@@ -246,7 +257,11 @@ class DataAccessioner:
             replacement_path = os.path.join(os.path.dirname(bag_path),replacement_name)
             os.rename(bag_path, replacement_path)
 
-        return replacement_path
+        bag_renamed = []
+        if bag_name != replacement_name:
+            bag_renamed.append("\\"+bag_name)
+            bag_renamed.append("\\"+replacement_name)
+        return (replacement_path, bag_renamed)
 
     def format_bag_name(self,bag_path):
         bag_name = os.path.basename(bag_path)
@@ -324,7 +339,7 @@ class DataAccessioner:
                 renamed_files_list = renamed_files_list + (self.cleanse_dict(path_to_data,bag_dict[repl_str], depth+1))
         return renamed_files_list
 
-    def write_rename_file(self, bag_path, files_to_rename):
+    def write_rename_file(self, bag_path, files_to_rename, bag_renamed):
         rename_file_path = os.path.join(bag_path,"data","meta","renames")
         out_file = ""
         append_to_old_file = True
@@ -338,9 +353,16 @@ class DataAccessioner:
         writer = csv.writer(out_file, delimiter=",", quotechar='"', quoting=csv.QUOTE_ALL)
 
         if not append_to_old_file:
-            writer.writerow(["New_Name", "Old_Name", "Date"])
+            writer.writerow(["Old_Name", "New_Name", "Date"])
 
-        writer.writerows(files_to_rename)
+        if len(bag_renamed) == 2:
+            bag_renamed.append(str(datetime.datetime.now()))
+            writer.writerow(bag_renamed)
+
+        for row in files_to_rename:
+            row.append(str(datetime.datetime.now()))
+            writer.writerow(row)
+
         out_file.close()
 
     def traverse_bag_contents(self, bag_path, verbose=0):
