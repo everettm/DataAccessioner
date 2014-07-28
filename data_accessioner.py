@@ -183,13 +183,7 @@ class DataAccessioner:
         Given a full path to a file, creates a new "bag" to hold it, writes the bag's information to file, and returns the new bag name.
         """
         new_directory = os.path.splitext(file_path)[0]
-
-        # ignores first chars b/c colon from C: will be removed. (for now) the parent dir must not have any spaces. Code from cleanse_bag_name
-        replacement_name = new_directory[2:]
-        for match in self.chars_to_remove.finditer(new_directory):
-            replacement_name = replacement_name.replace(match.group(), "_")
-        replacement_name = replacement_name.encode('cp850', errors='ignore')
-        new_directory = new_directory[:2] + replacement_name
+        new_directory = new_directory.encode('cp850', errors='ignore')
 
         if os.path.exists(new_directory):
             i = 1
