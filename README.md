@@ -1,7 +1,8 @@
 Archives Data Accessioner
 =========================
 
-Code by Liam Everett liam.m.everett@gmail.com
+Code by Liam Everett liam.m.everett@gmail.com  
+Edited by Sahree Kasper sahreek@gmail.com
 
 General Description:
 * Given a directory of folders to be accessioned, this program will create a bagit bag structure for each folder, cleanse filenames, and generate an import template for the bags.
@@ -11,10 +12,10 @@ Usage Instructions
 ------------------
 Run this program with the following syntax:
 
-`python data_accessioner.py [options] <path>`
-Options: 
-	-h, --help
-	-d, --debug
+`python data_accessioner.py [options] <path>`  
+Options:  
+- -h, --help
+- -d, --debug
 
 #### Input (2 options)
 * A full path to a directory OR a directory name in the same folder as data_accessioner.py. This directory should contain files and "bags" for accessioning.
@@ -29,13 +30,10 @@ Options:
 
 Notes
 -----
-This program will overwrite original filenames and the given directory's subdirectory names, which are stored in "renames.csv" of each bag's "meta" folder.
-Bagit link: https://wiki.carleton.edu/display/carl/Bagit
+This program will overwrite original filenames and the given directory's subdirectory names, which are stored in "renames.csv" of each bag's "meta" folder.  
+[Bagit](https://wiki.carleton.edu/display/carl/Bagit)
 
 #### TODO:
--Directories containing numbers get stored with a weird identifier. Fix that?
--some ImportTemplate edits
-	-change Extent and ExtentUnit
-	-minimum value (0.01 gigs) for Extent, Received Extent, and Processed Extent
-	-Identifier = <date>_<hr:min:sec>
--ensure <date>_<hr:min:sec> are different for each folder. Add 1 second pause between only if identical?
+- Directories containing numbers get stored with a weird identifier. Fix that?
+- try [optparse](https://docs.python.org/2/library/optparse.html) for system argument options?
+- test read-only access with \data\originals folders
