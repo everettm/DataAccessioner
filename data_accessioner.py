@@ -81,8 +81,7 @@ class DataAccessioner:
 
     def initialize_import_file(self, top_dir):
         if self.create_import_file:
-
-            file_name = "ImportTemplate_%s%02d%02d" % (self.now.year, self.now.month, self.now.day)
+            file_name = r"ImportTemplate_%s%02d%02d" % (self.now.year, self.now.month, self.now.day)
             i = ""
             if os.path.exists(os.path.join(top_dir,file_name + '.csv')):
                 file_name = file_name + "_"
@@ -252,18 +251,13 @@ class DataAccessioner:
 
     def format_bag_name(self,now,bag_path):
         bag_name = os.path.basename(bag_path)
+
+        # Again, format: yyyyddmm_hhmmss_originalDirTitle
+        date_created = "%s%02d%02d_%02d%02d%02d" % (self.now.year, self.now.day, \
+        self.now.month, self.now.hour, self.now.minute, self.now.second)
+
         if self.valid_bag_name_format.search(bag_name) == None:
-
-            # Again, format: yyyyddmm_hhmmss_originalDirTitle
-            date_created = "%s%02d%02d_%02d%02d%02d" % (self.now.year, self.now.day, \
-            self.now.month, self.now.hour, self.now.minute, self.now.second)
             new_valid_bag_name = "%s_%s" % (date_created,bag_name)
-
-            while os.path.exists(os.path.join(os.path.dirname(bag_path),new_valid_bag_name)):
-                date_created = "%s%02d%02d_%02d%02d%02d" % (self.now.year, self.now.day, \
-                self.now.month, self.now.hour, self.now.minute, self.now.second + 1)
-                new_valid_bag_name = "%s_%s" % (date_created,bag_name)
-                
             os.rename(bag_path,os.path.join(os.path.dirname(bag_path),new_valid_bag_name))
             bag_path = os.path.join(os.path.dirname(bag_path),new_valid_bag_name)
 
@@ -355,7 +349,6 @@ class DataAccessioner:
         """
         Returns: size, extensions, num_files
         """
-
         total_size = 0
         file_types = set()
         num_files = 0
@@ -400,7 +393,7 @@ def usage_message():
             \n\tpython data_accessioner.py -h | --help\
         \n\nOptions:\
             \n\t-h --help\tShow this screen.\
-            \n\t-d --debug\tCopies orignal directory into <path>-copy.\
+            \n\t-d --debug\tCreates a new copy of the original folder or file.\
         \n\nDependencies:\
             \n\taccession_settings.txt"
 
@@ -416,13 +409,10 @@ def main():
 
     if os.path.exists(path_arg):
         if sys.argv[1] == "-d" or sys.argv[1] == "--debug":
-            if os.path.exists(path_arg + "-copy"):
-                shutil.rmtree(path_arg)
-                shutil.copytree(path_arg + "-copy", path_arg)
-            else:
-                if os.path.isdir(path_arg):
-                    shutil.copytree(path_arg, path_arg + "-copy")
-        print path_arg
+            timestamp = "_%s%02d%02d_%02d%02d%02d" % (accessioner.now.year, accessioner.now.day, \
+            accessioner.now.month, accessioner.now.hour, accessioner.now.minute, accessioner.now.second)
+            shutil.copytree(path_arg, path_arg + timestamp)
+            path_arg = path_arg + timestamp
         accessioner.accession_bags_in_dir(path_arg, import_file)
 
     else:

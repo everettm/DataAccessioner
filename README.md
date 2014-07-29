@@ -12,14 +12,13 @@ Usage Instructions
 ------------------
 Run this program with the following syntax:
 
-`python data_accessioner.py [options] <path>`  
+`python data_accessioner.py [option] <path>`  
 Options:  
-- -h, --help
-- -d, --debug
+-h, --help: shows help menu  
+-d, --debug: creates a new copy of the original folder or file
 
-#### Input (2 options)
+#### Input
 * A full path to a directory OR a directory name in the same folder as data_accessioner.py. This directory should contain files and "bags" for accessioning.
-* A full path to a file OR a file name in the same folder as data_accessioner.py.
 
 #### Output
 * ImportTemplate_<date>.csv, an import template with information on each bag in the directory, stored in the directory (or, in the same directory as data_accessioner.py if a file was specified as the argument).
@@ -27,13 +26,12 @@ Options:
 	* /data/dips/
 	* /data/meta/ (contains a .csv document with original file names and date changed, if applicable)
 	* /data/originals/ (contains all of the data that the bag held originally)
+* If the debug option is indicated, a new file or directory will be created with a timestamp ("_DD/MM/YY_HH/MM/SS") appended to its name.  
 
 Notes
 -----
-This program will overwrite original filenames and the given directory's subdirectory names, which are stored in "renames.csv" of each bag's "meta" folder.  
-[Bagit](https://wiki.carleton.edu/display/carl/Bagit)
+This program will overwrite original filenames and the given directory's subdirectory names, which are stored in "renames.csv" of each bag's "meta" folder.    
+The [BagIt](http://en.wikipedia.org/wiki/BagIt) bag file creation aspect was removed but the structure remains (/top_dir/bag/data/). To bag everything, run BagIt on individual folders or [bagbatch](https://wiki.carleton.edu/display/carl/Bagit) on the top_dir directory.
 
 #### TODO:
-- Directories containing numbers get stored with a weird identifier. Fix that?
-- try [optparse](https://docs.python.org/2/library/optparse.html) for system argument options?
-- test read-only access with \data\originals folders
+- run more tests on different folders
