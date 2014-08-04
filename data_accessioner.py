@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 ''' 
 data_accessioner.py
 Code by Liam Everett
@@ -12,6 +14,7 @@ import csv
 import re
 import shutil
 import ast
+import string
 
 class DataAccessioner:
     def __init__(self,settings_file):
@@ -119,10 +122,10 @@ class DataAccessioner:
         # update self.now ONCE per bag
         time.sleep(1)
         self.now = datetime.datetime.now()
+        bag_path, identifier = self.format_bag_name(self.now,bag_path) # Add an identifier if needed
         self.create_bag_structure(bag_path)
         bag_path, bag_renamed = self.cleanse_bag_name(bag_path) # Remove special characters
         
-        bag_path, identifier = self.format_bag_name(self.now,bag_path) # Add an identifier if needed
         
         # cleanse filenames in bag, save rename.csv metadata
         b_dict, needs_renaming = self.create_relative_bag_dict(bag_path,os.path.join(bag_path,"data","originals"),0)
@@ -333,7 +336,7 @@ class DataAccessioner:
         writer = csv.writer(out_file, delimiter=",", quotechar='"', quoting=csv.QUOTE_ALL)
 
         if not append_to_old_file:
-            writer.writerow(["Old_Name", "New_Name", "Date"])
+            writer.writerow(["Old_Name", "New_Name", "Date Renamed"])
 
         if len(bag_renamed) == 2:
             bag_renamed.append(str(self.now))
@@ -397,6 +400,36 @@ def usage_message():
         \n\nDependencies:\
             \n\taccession_settings.txt"
 
+
+def remove_special_characters(value):
+    """ Perhaps include this in accession_settings """
+    deletechars = '®©™'
+    for c in deletechars:
+        value = value.replace(c,'')
+    return value
+
+def rec_traverse_dir(curr_dir,root):
+    """ recursive function to traverse the directory. from http://stackoverflow.com/a/13528334/3889452"""
+    try :
+        dfList = [os.path.join(curr_dir, f_or_d) for f_or_d in os.listdir(curr_dir)]
+    except:
+        print "wrong path name/directory name"
+        return
+
+    for file_or_dir in dfList:
+        rename = remove_special_characters(file_or_dir)
+        if os.path.isfile(file_or_dir):
+            try:
+                shutil.move(os.path.join(root,file_or_dir),os.path.join(root,rename))
+            except:
+                print 'error with file',os.path.join(root,file_or_dir)
+        if os.path.isdir(file_or_dir):
+            try:
+                shutil.move(os.path.join(root,file_or_dir),os.path.join(root,rename))
+                rec_traverse_dir(rename,root)
+            except:
+                print 'error with folder',os.path.join(root,file_or_dir)
+
 def main():
     accessioner = DataAccessioner('accession_settings.txt')
 
@@ -413,6 +446,8 @@ def main():
             accessioner.now.month, accessioner.now.hour, accessioner.now.minute, accessioner.now.second)
             shutil.copytree(path_arg, path_arg + timestamp)
             path_arg = path_arg + timestamp
+
+        rec_traverse_dir(path_arg,path_arg)
         accessioner.accession_bags_in_dir(path_arg, import_file)
 
     else:

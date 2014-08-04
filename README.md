@@ -34,4 +34,5 @@ This program will overwrite original filenames and the given directory's subdire
 The [BagIt](http://en.wikipedia.org/wiki/BagIt) bag file creation aspect was removed but the structure remains (/top_dir/bag/data/). To bag everything, run BagIt on individual folders or [bagbatch](https://wiki.carleton.edu/display/carl/Bagit) on the top_dir directory.
 
 #### TODO:
-- run more tests on different folders
+- debug option cannot make a complete copy of the directory if there are folders or files with invalid characters (for windows - test this on a mac?). Tried using os, shutil, and glob. Glob is the best best, as it can use wildcards, but haven't gotten a working implementation yet. However, WITHOUT using the debug option this problem can be avoided and the accessioner works just fine on these files (and also removes these particular invalid characters)  
+- filenames with a period are being confused for extensions - not sure if there's any way to fix this
