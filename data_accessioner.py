@@ -15,6 +15,7 @@ import re
 import shutil
 import ast
 import string
+import platform
 
 class DataAccessioner:
     def __init__(self,settings_file):
@@ -26,7 +27,10 @@ class DataAccessioner:
         # Regular expressions for file name cleansing
         # Bag format: yyyyddmm_hhmmss_originalDirTitle
         self.valid_bag_name_format = re.compile("^[0-9]{8}_[0-9]{6}_.*")
-        self.chars_to_remove = re.compile("[:/'\+\=,\!\@\#\$\%\^\&\*\(\)\]\[ \t]") # characters to remove from files
+        if sys.platform == 'win32' or platform.system() == 'Windows':
+            self.chars_to_remove = re.compile("[:/'\+\=,\!\@\#\$\%\^\&\*\(\)\]\[ \t]") # characters to remove from files
+        else:
+            self.chars_to_remove = re.compile("[:'\+\=,\!\@\#\$\%\^\&\*\(\)\]\[ \t]") # characters to remove from files
 
         # Global dictionaries/lists for use in various methods
         self.original_file_names = {} # entries will be of the form {new_name:old_name}
@@ -96,7 +100,9 @@ class DataAccessioner:
             self.import_writer = csv.writer(self.import_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
             self.import_writer.writerow(self.import_header)
 
-    def accession_bags_in_dir(self,top_dir, import_file):
+    def accession_bags_in_dir(self, top_dir, import_file):
+        """ Accessions all items using the given directory and creates an 
+        import file. """
         self.create_import_file = import_file
         self.initialize_import_file(top_dir)
 
@@ -116,16 +122,15 @@ class DataAccessioner:
         print "done"
 
     def accession_bag(self, bag_path):
-        """
-        Given a full path to a directory, "bags" that data, writes the bag's information to file, and returns the new bag name.
-        """
-        # update self.now ONCE per bag
+        """ Given a full path to a directory, "bags" that data, writes the 
+        bag's information to file, and returns the new bag name. """
+        # update self.now ONCE per bag, preventing duplicate names while avoiding longer waits
         time.sleep(1)
         self.now = datetime.datetime.now()
-        bag_path, identifier = self.format_bag_name(self.now,bag_path) # Add an identifier if needed
+        bag_path, identifier = self.format_bag_name(self.now,bag_path)
         self.create_bag_structure(bag_path)
+
         bag_path, bag_renamed = self.cleanse_bag_name(bag_path) # Remove special characters
-        
         
         # cleanse filenames in bag, save rename.csv metadata
         b_dict, needs_renaming = self.create_relative_bag_dict(bag_path,os.path.join(bag_path,"data","originals"),0)
@@ -255,7 +260,7 @@ class DataAccessioner:
     def format_bag_name(self,now,bag_path):
         bag_name = os.path.basename(bag_path)
 
-        # Again, format: yyyyddmm_hhmmss_originalDirTitle
+        # format: yyyyddmm_hhmmss_originalDirTitle
         date_created = "%s%02d%02d_%02d%02d%02d" % (self.now.year, self.now.day, \
         self.now.month, self.now.hour, self.now.minute, self.now.second)
 
@@ -297,29 +302,34 @@ class DataAccessioner:
             sub_dict[new_key] = sub_sub_dict[new_key]
         return return_dict, needs_renaming
     
-    def cleanse_dict(self, path_to_data,bag_dict, depth):
+    def cleanse_dict(self, path_to_data, bag_dict, depth):
+        """ Given a path, dictionary, and depth, this function renames files 
+        (and folders?) and returns a list of the renamed files (and folders?) """
         renamed_files_list = []
         for item in bag_dict:
             repl_str = item
-            # Remove any chars if necessary
+            
             repl_str = repl_str.encode('cp850', errors='ignore')
             for match in self.chars_to_remove.finditer(item):
                 repl_str = repl_str.replace(match.group(), "_")
+
             # Rename the file if necessary, remove the previous key in place of the new one
-            if repl_str != item:
+            if os.path.basename(repl_str) != os.path.basename(item):
                 # If new name is in use, add an index
-                if os.path.exists(os.path.join(path_to_data,repl_str)):
-                    rename_index = 1
-                    while os.path.exists(os.path.join(path_to_data,repl_str + "_" + str(rename_index))):
-                        rename_index += 1
-                    repl_str = repl_str + "_" + str(rename_index)
-                # Rename the file
+                repl_str = path_already_exists(os.path.join(path_to_data,repl_str))
+
+                # print 'oldname',os.path.join(path_to_data,os.path.dirname(repl_str),os.path.basename(item)).encode('utf-8')
+                # print 'newname',os.path.join(path_to_data,repl_str).encode('utf-8')
+                
+                # Rename the file, update dictionary and renames list
                 os.rename(os.path.join(path_to_data,os.path.dirname(repl_str),os.path.basename(item)),os.path.join(path_to_data,repl_str))
                 bag_dict[repl_str] = bag_dict[item]
                 renamed_files_list.append(list((item.encode('cp850', errors='replace'), repl_str)))
                 del bag_dict[item]
-            if bag_dict[repl_str] != "":
-                renamed_files_list = renamed_files_list + (self.cleanse_dict(path_to_data,bag_dict[repl_str], depth+1))
+
+            if repl_str in bag_dict:
+                if bag_dict[repl_str] != "":
+                    renamed_files_list = renamed_files_list + (self.cleanse_dict(path_to_data,bag_dict[repl_str], depth+1))
         return renamed_files_list
 
     def write_rename_file(self, bag_path, files_to_rename, bag_renamed):
@@ -400,16 +410,35 @@ def usage_message():
         \n\nDependencies:\
             \n\taccession_settings.txt"
 
+def path_already_exists(path):
+    """ Given a path, checks to see if it already exists. If it does, a new 
+    with a corresponding index number (that counts up) is returned, such as 
+    "/New_Folder_2". If it doesn't, the original path is returned. """
+    if os.path.exists(path):
+        rename_index = 1
+        while os.path.exists(path + "_" + str(rename_index)):
+            rename_index += 1
+        path = path + "_" + str(rename_index)
+    return path 
 
 def remove_special_characters(value):
-    """ Perhaps include this in accession_settings """
+    """ Given a string, removes the characters specified in deletechars and 
+    returns the new value. At the time of writing, the primary goal was to 
+    remove registered trademark symbols (®) from path names. The header: 
+        #!/usr/bin/env python 
+        # -*- coding: utf-8 -*-
+    is necessary for python to interpret these symbols. 
+    See http://stackoverflow.com/q/1033424/3889452 and http://stackoverflow.com/a/25067408/3889452 """
     deletechars = '®©™'
     for c in deletechars:
         value = value.replace(c,'')
     return value
 
 def rec_traverse_dir(curr_dir,root):
-    """ recursive function to traverse the directory. from http://stackoverflow.com/a/13528334/3889452"""
+    """ Recursive function to traverse the current directory. Used in 
+    conjuction with remove_special_characters() to remove all invalid values 
+    from all subdirectories and their files. See 
+    http://stackoverflow.com/a/13528334/3889452"""
     try :
         dfList = [os.path.join(curr_dir, f_or_d) for f_or_d in os.listdir(curr_dir)]
     except:
@@ -420,6 +449,7 @@ def rec_traverse_dir(curr_dir,root):
         rename = remove_special_characters(file_or_dir)
         if os.path.isfile(file_or_dir):
             try:
+                # new_path = path_already_exists(os.path.join(root,rename))
                 shutil.move(os.path.join(root,file_or_dir),os.path.join(root,rename))
             except:
                 print 'error with file',os.path.join(root,file_or_dir)
