@@ -13,9 +13,10 @@ Usage Instructions
 Run this program with the following syntax:
 
 `python data_accessioner.py [option] <path>`  
+Dependency: accession_settings.txt  
 Options:  
 -h, --help: shows help menu  
--d, --debug: creates a new copy of the original folder or file
+-d, --debug: creates a new copy of the original folder or file  
 
 #### Input
 * A full path to a directory OR a directory name in the same folder as data_accessioner.py. This directory should contain files and "bags" for accessioning.
