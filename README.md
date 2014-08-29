@@ -31,11 +31,9 @@ Options:
 
 Notes
 -----
-This program will overwrite original filenames and the given directory's subdirectory names, which are stored in "renames.csv" of each bag's "meta" folder.    
+This program will overwrite original filenames and the given directory's subdirectory names, which are stored in "renames.csv" of each bag's "meta" folder. However, Python has issues reading ®, ©, ™, and , so the original names of files and folders containing these characters are not preserved in renames.csv.     
 The [BagIt](http://en.wikipedia.org/wiki/BagIt) bag file creation aspect was removed but the structure remains (/top_dir/bag/data/). To bag everything, run BagIt on individual folders or [bagbatch](https://wiki.carleton.edu/display/carl/Bagit) on the top_dir directory.
 
 #### TODO:
 - debug option cannot make a complete copy of the directory if there are folders or files with invalid characters (for windows - test this on a mac?). Tried using os, shutil, and glob. Glob is the best best, as it can use wildcards, but haven't gotten a working implementation yet. However, WITHOUT using the debug option this problem can be avoided and the accessioner works just fine on these files (and also removes these particular invalid characters)  
 - filenames with a period are being confused for extensions - not sure if there's any way to fix this  
-- when completely removing characters like ®, make sure that file/folder name doesn't already exist (similar to how cleanse_dict() uses path_already_exists())  
-- consider adding deletechars from remove_special_characters() to accession_settings.txt  

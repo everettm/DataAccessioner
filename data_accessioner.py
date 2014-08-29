@@ -83,8 +83,8 @@ class DataAccessioner:
         if self.create_import_file:
             file_name = r"ImportTemplate_%s%02d%02d" % (self.now.year, self.now.month, self.now.day)
             file_name = path_already_exists(os.path.join(top_dir,file_name + '.csv'))
-            self.import_file_name = file_name + '.csv'
-            self.import_file = open(os.path.join(top_dir,file_name + '.csv'),'wb')
+            self.import_file_name = file_name
+            self.import_file = open(os.path.join(top_dir,file_name),'wb')
             self.import_writer = csv.writer(self.import_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
             self.import_writer.writerow(self.import_header)
 
@@ -99,9 +99,12 @@ class DataAccessioner:
         # creates a list of paths to all files and folders/bags in top_dir
         path_list = [x for x in os.listdir(ast.literal_eval("u'" + (top_dir.replace("\\", "\\\\")) + "'")) if x != self.import_file_name]
         for bag in path_list:
+            full_bag_path = os.path.join(top_dir,bag)
+            # prevents the import file from being bagged
+            if re.sub(r'_\d+', '', full_bag_path) == re.sub(r'_\d+', '', self.import_file_name):
+                continue
             if not self.is_excluded(bag):
                 print "current bag:", bag, "\n"
-                full_bag_path = os.path.join(top_dir,bag)
                 if not os.path.isdir(full_bag_path):
                     bag = self.accession_file(full_bag_path)
                 else:
@@ -173,6 +176,7 @@ class DataAccessioner:
             self.import_row["Extent"] = file_size_string
             
             extension_string = "Extensions include: "
+            print extensions
             for item in extensions:
                 if len(item) > 0:
                     extension_string = extension_string + item + "; "
@@ -384,8 +388,7 @@ class DataAccessioner:
                 filepath = os.path.join(root,names)
                 if not self.is_excluded(names):
                     total_size += os.path.getsize(filepath)
-                    ext_type = os.path.splitext(filepath)[1]
-                    file_types.add(ext_type)
+                    file_types.add(os.path.splitext(filepath)[1])
 
         return total_size, file_types, num_files
 
@@ -409,7 +412,11 @@ def rec_traverse_dir(curr_dir, root):
                 print 'error with file', os.path.join(root, file_or_dir)
         if os.path.isdir(file_or_dir):
             try:
-                shutil.move(os.path.join(root,file_or_dir),os.path.join(root, rename))
+                # if statement: renames name w/ bad chars, and if rename exists 
+                # already, gives it an index. Not perfect.       
+                if not os.path.join(root, rename) == file_or_dir:
+                    rename = path_already_exists(os.path.join(root, rename))
+                shutil.move(os.path.join(root, file_or_dir), os.path.join(root, rename))
                 rec_traverse_dir(rename, root)
             except:
                 print 'error with folder', os.path.join(root, file_or_dir)
@@ -434,10 +441,13 @@ def path_already_exists(path):
     with a corresponding index number (that counts up) is returned, such as 
     "/New_Folder_2". If it doesn't, the original path is returned. """
     if os.path.exists(path):
+        ext = ''
+        if os.path.isfile(path):
+            path, ext = os.path.splitext(path)
         rename_index = 1
-        while os.path.exists(path + "_" + str(rename_index)):
+        while os.path.exists(path + "_" + str(rename_index) + ext):
             rename_index += 1
-        path = path + "_" + str(rename_index)
+        path = path + "_" + str(rename_index) + ext
     return path 
 
 def usage_message():
