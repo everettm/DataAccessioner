@@ -1,12 +1,5 @@
-EXCLUDES:
-Thumbs.db
-.DS_Store
-bagit.txt
-manifest-md5.txt
-tagmanifest-md5.txt
-bag-info.txt
+EXCLUDES: Thumbs.db, .DS_Store, bagit.txt, manifest-md5.txt, tagmanifest-md5.txt, bag-info.txt
 
-EXCLUDE_REGEX:
-ImportTemplate_[0-9]{8}(_[0-9]+)?\.csv
+EXCLUDE_REGEX: ImportTemplate_[0-9]{8}(_[0-9]+)?\.csv
 
-STORAGE_LOCATION_NAME = Archives Network Storage 1
+STORAGE_LOCATION_NAME: Archives Network Storage 1

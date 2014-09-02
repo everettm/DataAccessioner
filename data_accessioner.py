@@ -16,26 +16,22 @@ import shutil
 
 class DataAccessioner:
     def __init__(self,settings_file):
-        self.excludes = []
-        self.excludes_regex = []
+        self.excludes, self.excludes_regex = [], []
         self.storage_location_name = ""
         self.initialize_accession_settings(settings_file)
 
         # Regular expressions for file name cleansing
         self.valid_bag_name_format = re.compile("^[0-9]{8}_[0-9]{6}_.*")
+        self.chars_to_remove = re.compile("[:'\+\=,\!\@\#\$\%\^\&\*\(\)\]\[ \t]") # non-Windows
         if sys.platform == 'win32' or platform.system() == 'Windows':
             self.chars_to_remove = re.compile("[:/'\+\=,\!\@\#\$\%\^\&\*\(\)\]\[ \t]")
-        else:
-            self.chars_to_remove = re.compile("[:'\+\=,\!\@\#\$\%\^\&\*\(\)\]\[ \t]")
 
         self.import_file_name, self.import_file, self.import_writer = None, None, None
-        self.import_header = ["Month", "Day", "Year", "Title", "Identifier", \
-        "Inclusive Dates", "Received Extent", "Extent Unit", "Processed Extent", \
-        "Extent Unit", "Material Type", "Processing Priority", "Ex. Comp. Mont", \
-        "Ex. Comp. Day", "Ex. Comp. Year", "Record Series", "Content", "Location", \
-        "Range", "Section", "Shelf", "Extent", "ExtentUnit", "CreatorName", \
-        "Donor", "Donor Contact Info", "Donor Notes", "Physical Description", \
-        "Scope Content", "Comments"]
+        self.import_header = ["Month", "Day", "Year", "Title", "Identifier", "Inclusive Dates", 
+        "Received Extent", "Extent Unit", "Processed Extent", "Extent Unit", "Material Type", 
+        "Processing Priority", "Ex. Comp. Mont", "Ex. Comp. Day", "Ex. Comp. Year", "Record Series", 
+        "Content", "Location", "Range", "Section", "Shelf", "Extent", "ExtentUnit", "CreatorName", 
+        "Donor", "Donor Contact Info", "Donor Notes", "Physical Description", "Scope Content", "Comments"]
 
         # Will keep track of values for the current bag's row in the import file
         self.import_row = {val:"" for val in self.import_header}
@@ -48,38 +44,21 @@ class DataAccessioner:
         self.import_row["Location"] = self.storage_location_name
         self.import_row["ExtentUnit"] = "Gigabytes"
 
-    def initialize_accession_settings(self,settings_file):
+    def initialize_accession_settings(self, settings_file):
         """ Parses accession_settings.txt to set self.excludes, self.excludes_regex,
         and self.storage_location_name """        
         with open(settings_file) as f:
-            f_content = [line.rstrip() for line in f]
-            parse_state = "none"
-            for i in range(len(f_content)):
-                line = f_content[i]
-                if parse_state == "none":
-                    if line == "EXCLUDES:":
-                        parse_state = "excludes"
-                    elif line[:23] == "STORAGE_LOCATION_NAME =":
-                        self.storage_location_name = line[24:]
-                    elif line == "EXCLUDE_REGEX:":
-                        parse_state = "regex"
-                elif parse_state == "excludes":
-                    if line != "":
-                        self.excludes.append(line)
-                    else:
-                        parse_state = "none"
-                elif parse_state == "regex":
-                    if line != "":
-                        self.excludes_regex.append(line)
-                    else:
-                        parse_state = "none"
-        for i in range(len(self.excludes_regex)):
-            self.excludes_regex[i] = re.compile(self.excludes_regex[i])
+            for line in f:
+                if line.startswith('EXCLUDES'):
+                    self.excludes = line.strip('EXCLUDES: ').strip('\n').split(', ')
+                if line.startswith('EXCLUDE_REGEX'):
+                    self.excludes_regex = [re.compile(line.strip('EXCLUDE_REGEX: ').strip('\n'))]
+                if line.startswith('STORAGE_LOCATION_NAME'):
+                    self.storage_location_name = line.strip('STORAGE_LOCATION_NAME:').strip(' ').strip('\n')
 
     def initialize_import_file(self, top_dir):
-        """ As long as self.create_import_file is set as True (can be set False when
-        calling accession_bags_in_dir), an import file overviewing the contents of 
-        the bags will be created. """
+        """ If self.create_import_file is True (set to False when calling accession_bags_
+        in_dir()), an import file (for archon database) for the bags will be created. """
         if self.create_import_file:
             file_name = r"ImportTemplate_%s%02d%02d" % (self.now.year, self.now.month, self.now.day)
             file_name = path_already_exists(os.path.join(top_dir,file_name + '.csv'))
@@ -154,40 +133,20 @@ class DataAccessioner:
         if needs_renaming or bags_renamed:
             renamed_files_list = self.cleanse_dict(os.path.join(bag_path,"data"),b_dict,0)
             self.write_rename_file(bag_path,renamed_files_list,bags_renamed)
-
-        size, extensions, num_files = self.traverse_bag_contents(bag_path)
         
         if self.create_import_file:
+            size, extensions, num_files = self.traverse_bag_contents(bag_path)
             bag_name = os.path.basename(bag_path)
-
             self.import_row["Title"] = bag_name
+            self.import_row["Identifier"] = identifier
+            self.import_row["Received Extent"] = size
+            self.import_row["Processed Extent"] = size
             self.import_row["Content"] = bag_name
             self.import_row["Scope Content"] = bag_name
-            self.import_row["Identifier"] = identifier
+            self.import_row["Extent"] = size
+            self.import_row["Physical Description"] = "Extensions include: " + "; ".join(extensions)
 
-            conversion = 9.31323e-10
-            file_size = size * conversion
-            file_size_string = "%.2f" % file_size
-            if file_size < 0.01:
-                file_size_string = "0.01"
-
-            self.import_row["Received Extent"] = file_size_string
-            self.import_row["Processed Extent"] = file_size_string
-            self.import_row["Extent"] = file_size_string
-            
-            extension_string = "Extensions include: "
-            print extensions
-            for item in extensions:
-                if len(item) > 0:
-                    extension_string = extension_string + item + "; "
-            if len(extensions) == 0:
-                extension_string = ""
-            else:
-                extension_string = extension_string[:len(extension_string)-2]
-
-            self.import_row["Physical Description"] = extension_string
-
-            # write the import template row
+            # Writes data to the import template
             new_row = []
             for item in self.import_header:
                 new_row.append(self.import_row[item])
@@ -196,13 +155,11 @@ class DataAccessioner:
         return os.path.basename(bag_path)
 
     def format_bag_name(self, bag_path):
-        """ Renames the bag (folder) and its path in the format 
-        yyyyddmm_hhmmss_originalDirTitle, created from the self.now timestamp. 
-        Returns the new bag path and the date_created, to be used as the bag's 
-        identifier. """
+        """ Renames the bag (folder) in the format yyyyddmm_hhmmss_originalDirTitle, 
+        created from the self.now timestamp. Returns the new bag path and the 
+        date_created, to be used as the bag's identifier. """
         bag_name = os.path.basename(bag_path)
 
-        # format: yyyyddmm_hhmmss_originalDirTitle
         date_created = "%s%02d%02d_%02d%02d%02d" % (self.now.year, self.now.day, \
         self.now.month, self.now.hour, self.now.minute, self.now.second)
 
@@ -217,7 +174,7 @@ class DataAccessioner:
         """ Given the bag path, creates necessary directories and moves pre-existing 
         directories to the correct place. 
         Structure: bag/data, bag/data/dips, bag/data/meta, bag/data/originals """
-        # to be used if folders are already created but may need to be moved
+        # files_in_bag: if folders are already created but may need to be moved
         files_in_bag = set(os.listdir(bag_path))
         
         # If directory bag/data is not present, create it
@@ -226,29 +183,14 @@ class DataAccessioner:
         else:
             files_in_bag.remove("data")
 
-        # If these directories are present: bag/dips, bag/meta or bag/originals 
-        # move them to bag/data
-        if os.path.exists(os.path.join(bag_path,"dips")):
-            shutil.move(os.path.join(bag_path,"dips"),os.path.join(bag_path,"data"))
-            files_in_bag.remove("dips")
-
-        if os.path.exists(os.path.join(bag_path,"meta")):
-            shutil.move(os.path.join(bag_path,"meta"),os.path.join(bag_path,"data"))
-            files_in_bag.remove("meta")
-
-        if os.path.exists(os.path.join(bag_path,"originals")):
-            shutil.move(os.path.join(bag_path,"originals"),os.path.join(bag_path,"data"))
-            files_in_bag.remove("originals")
-
-        # If bag/data/originals, dips, or meta are not present in bag/data, create them
-        if not os.path.exists(os.path.join(bag_path,"data","originals")):
-            os.mkdir(os.path.join(bag_path,"data","originals"))
-
-        if not os.path.exists(os.path.join(bag_path,"data","dips")):
-            os.mkdir(os.path.join(bag_path,"data","dips"))
-
-        if not os.path.exists(os.path.join(bag_path,"data","meta")):
-            os.mkdir(os.path.join(bag_path,"data","meta"))
+        for dir_type in ["dips", "meta", "originals"]:
+            # If these directories are present in bag/: bag/dips, bag/meta or bag/originals move them to bag/data/
+            if os.path.exists(os.path.join(bag_path, dir_type)):
+                shutil.move(os.path.join(bag_path, dir_type),os.path.join(bag_path, dir_type))
+                files_in_bag.remove(dir_type)
+            # If bag/data/originals, dips, or meta are not present in bag/data, create them
+            if not os.path.exists(os.path.join(bag_path, "data", dir_type)):
+                os.mkdir(os.path.join(bag_path, "data", dir_type))
 
         # Move all other files in bag to bag/data/originals
         for f in files_in_bag:
@@ -369,7 +311,8 @@ class DataAccessioner:
         out_file.close()
 
     def traverse_bag_contents(self, bag_path):
-        """ Returns the size, extensions, and the number of files. """
+        """ Returns the size, extensions, and the number of files. num_files is not 
+        currently in use. """
         total_size = 0
         file_types = set()
         num_files = 0
@@ -388,9 +331,19 @@ class DataAccessioner:
                 filepath = os.path.join(root,names)
                 if not self.is_excluded(names):
                     total_size += os.path.getsize(filepath)
-                    file_types.add(os.path.splitext(filepath)[1])
+                    if not os.path.splitext(filepath)[1] == "":
+                        file_types.add(os.path.splitext(filepath)[1])
 
-        return total_size, file_types, num_files
+        return self.convert_size_to_string(total_size), file_types, num_files
+
+    def convert_size_to_string(self, size):
+        """ convert total_size to truncated string """
+        conversion = 9.31323e-10
+        file_size = size * conversion
+        file_size_string = "%.2f" % file_size
+        if file_size < 0.01:
+            file_size_string = "0.01"    
+        return file_size_string
 
 def rec_traverse_dir(curr_dir, root):
     """ Recursive function to traverse the current directory. Used in 
