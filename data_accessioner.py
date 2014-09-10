@@ -40,9 +40,8 @@ class DataAccessioner:
         self.import_row["Month"] = self.now.month
         self.import_row["Day"] = self.now.day
         self.import_row["Year"] = self.now.year
-        self.import_row["Extent Unit"] = "Gigabytes"
         self.import_row["Location"] = self.storage_location_name
-        self.import_row["ExtentUnit"] = "Gigabytes"
+        self.import_row["Extent Unit"], self.import_row["ExtentUnit"] = "Gigabytes", "Gigabytes"
 
     def initialize_accession_settings(self, settings_file):
         """ Parses accession_settings.txt to set self.excludes, self.excludes_regex,
@@ -60,10 +59,9 @@ class DataAccessioner:
         """ If self.create_import_file is True (set to False when calling accession_bags_
         in_dir()), an import file (for archon database) for the bags will be created. """
         if self.create_import_file:
-            file_name = r"ImportTemplate_%s%02d%02d" % (self.now.year, self.now.month, self.now.day)
-            file_name = path_already_exists(os.path.join(top_dir,file_name + '.csv'))
-            self.import_file_name = file_name
-            self.import_file = open(os.path.join(top_dir,file_name),'wb')
+            self.import_file_name = r"ImportTemplate_%s%02d%02d" % (self.now.year, self.now.month, self.now.day)
+            self.import_file_name = path_already_exists(os.path.join(top_dir,self.import_file_name + '.csv'))
+            self.import_file = open(os.path.join(top_dir,self.import_file_name),'wb')
             self.import_writer = csv.writer(self.import_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
             self.import_writer.writerow(self.import_header)
 
@@ -214,13 +212,11 @@ class DataAccessioner:
         """ Removes special characters listed in self.chars_to_remove from the given
         bag and replaces them with underscores. """
         replacement_path = bag_path
-
         bag_name = os.path.basename(bag_path)
         replacement_name = bag_name
 
         for match in self.chars_to_remove.finditer(bag_name):
             replacement_name = replacement_name.replace(match.group(), "_")
-
         replacement_name = replacement_name.encode('cp850', errors='ignore')
 
         if replacement_name != bag_name:
@@ -273,15 +269,15 @@ class DataAccessioner:
 
             # Rename the file if necessary, remove the previous key in place of the new one
             if os.path.basename(repl_str) != os.path.basename(item):
-                # If new name is in use, add an index
                 repl_str = path_already_exists(os.path.join(path_to_data,repl_str))
-                
                 # Rename the file, update dictionary and renames list
-                os.rename(os.path.join(path_to_data,os.path.dirname(repl_str),os.path.basename(item)),os.path.join(path_to_data,repl_str))
+                old_name = os.path.join(path_to_data,os.path.dirname(repl_str),os.path.basename(item))
+                os.rename(old_name, os.path.join(path_to_data,repl_str))
                 bag_dict[repl_str] = bag_dict[item]
-                renamed_files_list.append(list((item.encode('cp850', errors='replace'), repl_str)))
+                renamed_files_list.append(list((os.path.basename(item.encode('cp850', errors='replace')), os.path.basename(repl_str))))
                 del bag_dict[item]
 
+            # renames all subdirectories and files
             if repl_str in bag_dict:
                 if bag_dict[repl_str] != "":
                     renamed_files_list = renamed_files_list + (self.cleanse_dict(path_to_data,bag_dict[repl_str], depth+1))
@@ -294,10 +290,10 @@ class DataAccessioner:
 
         if os.path.exists(rename_file_path + ".csv"):
             out_file = open(rename_file_path + ".csv", "ab")
-            writer = csv.writer(out_file, delimiter=",", quotechar='"', quoting=csv.QUOTE_ALL)
+            writer = csv.writer(out_file, quoting=csv.QUOTE_ALL)
         else:
             out_file = open(rename_file_path + ".csv", "wb")
-            writer = csv.writer(out_file, delimiter=",", quotechar='"', quoting=csv.QUOTE_ALL)
+            writer = csv.writer(out_file, quoting=csv.QUOTE_ALL)
             writer.writerow(["Old_Name", "New_Name", "Date Renamed"])
 
         if len(bags_renamed) == 2:
@@ -305,6 +301,7 @@ class DataAccessioner:
             writer.writerow(bags_renamed)
 
         for row in files_to_rename:
+            row[0], row[1] = os.path.basename(row[0]), os.path.basename(row[1])
             row.append(str(self.now))
             writer.writerow(row)
 
@@ -337,7 +334,7 @@ class DataAccessioner:
         return self.convert_size_to_string(total_size), file_types, num_files
 
     def convert_size_to_string(self, size):
-        """ convert total_size to truncated string """
+        """ If size < 0.01, return 0.01. Otherwise convert size into a truncated string. """
         conversion = 9.31323e-10
         file_size = size * conversion
         file_size_string = "%.2f" % file_size
@@ -347,9 +344,8 @@ class DataAccessioner:
 
 def rec_traverse_dir(curr_dir, root):
     """ Recursive function to traverse the current directory. Used in 
-    conjuction with remove_special_characters() to remove all invalid values 
-    from all subdirectories and their files. See 
-    http://stackoverflow.com/a/13528334/3889452"""
+    conjunction with remove_special_characters() to remove all invalid values 
+    from all subdirectories and their files. See http://stackoverflow.com/a/13528334/3889452"""
     try :
         dfList = [os.path.join(curr_dir, f_or_d) for f_or_d in os.listdir(curr_dir)]
     except:
